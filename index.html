@@ -473,7 +473,7 @@ const CONFIG = {
   SUPABASE_KEY: 'sb_publishable_r7hSygYetxzXdP_o81Qs1w_lG-GCTBW', // publishable key (pode ficar no site)
   TABELA: 'cozinha_itens',
   TABELA_ENVIOS: 'cozinha_envios',
-  ADMIN_NOME: 'Azafe',     // nome que aparece nas ações do administrador (reservado, ninguém mais pode usar)
+  ADMIN_NOME: 'Admin',     // nome que aparece nas ações do administrador (reservado, ninguém mais pode usar)
   // SHA-256 do código do administrador. Para trocar o código, gere o hash do novo e cole aqui.
   ADMIN_HASH: '4c853a64e191c45efee67734742a76b3a36536a564072c0bbb3377c862f26412',
   INTERVALO_MS: 20000      // de quanto em quanto tempo busca atualizações
@@ -781,7 +781,7 @@ function desenharTopo() {
   const hoje = new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' });
   $('dataHoje').textContent = hoje;
   $('dataHoje2').textContent = hoje;
-  $('btnQuem').textContent = (estado.usuario || 'Seu nome') + (estado.admin ? ' · admin' : '');
+  $('btnQuem').textContent = estado.admin ? CONFIG.ADMIN_NOME : (estado.usuario || 'Seu nome');
 
   const c = $('contaCompras');
   c.hidden = total === 0;
