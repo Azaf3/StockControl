@@ -375,6 +375,7 @@ fieldset.campo { border: 0; padding: 0; margin-left: 0; margin-right: 0; }
     <div class="acoes">
       <button class="btn btn-pri" type="button" id="btnCopiar">Copiar lista</button>
       <button class="btn btn-sec" type="button" id="btnTudo" hidden>Tudo comprado</button>
+      <button class="btn btn-sec" type="button" id="btnZerar" hidden>Zerar lista</button>
       <button class="btn btn-sec" type="button" id="btnGerenciar" aria-pressed="false" hidden>Gerenciar itens</button>
       <button class="btn btn-sec" type="button" id="btnRecibos" hidden>Recibos</button>
     </div>
@@ -706,6 +707,7 @@ const estado = {
   usuario: lerLocal(CH_NOME, ''),
   pendentes: 0,
   envio: null,
+  compra: null,
   admin: lerSessao(CH_ADMIN) === CONFIG.ADMIN_HASH,
   ultimaSinc: null
 };
@@ -714,10 +716,11 @@ async function carregar(silencioso) {
   if (estado.pendentes > 0 || fila.size > 0) return;
   if (!silencioso) { estado.carregando = true; desenhar(); }
   try {
-    const [itens, envio] = await Promise.all([api.listar(), api.ultimoEnvio().catch(() => estado.envio)]);
+    const [itens, envio, compras] = await Promise.all([api.listar(), api.ultimoEnvio().catch(() => estado.envio), api.listarCompras().catch(() => null)]);
     if (estado.pendentes > 0 || fila.size > 0) return; // alguém marcou algo enquanto buscava
     estado.itens = itens;
     estado.envio = envio;
+    if (compras) estado.compra = compras[0] || null;
     estado.erro = null;
     estado.ultimaSinc = new Date();
   } catch (e) {
@@ -807,8 +810,10 @@ function enviarTudo() { return Promise.all([...fila.keys()].map(enviar)); }
 function situacaoEnvio() {
   const faltas = estado.itens.filter((i) => i.status !== 'ok');
   if (!faltas.length) return null;
-  const t = estado.envio ? new Date(estado.envio.enviado_em).getTime() : 0;
-  return faltas.some((i) => new Date(i.atualizado_em).getTime() > t) ? 'pend' : 'ok';
+  const mudouDepois = (iso) => { const t = iso ? new Date(iso).getTime() : 0; return faltas.some((i) => new Date(i.atualizado_em).getTime() > t); };
+  // compra registrada e ninguém mexeu na lista depois: já foi comprada, só falta zerar
+  if (estado.compra && !mudouDepois(estado.compra.comprado_em)) return 'comprada';
+  return mudouDepois(estado.envio && estado.envio.enviado_em) ? 'pend' : 'ok';
 }
 
 function contar() {
@@ -858,8 +863,12 @@ function desenharTopo() {
   const quemQuando = ev ? esc(ev.enviado_por || 'Cozinha') + ', ' + quando(ev.enviado_em) : '';
   const cz = $('confCozinha'), cp = $('confCompras');
   cz.hidden = cp.hidden = !sit;
-  cz.className = cp.className = 'conf ' + (sit || '');
-  if (sit === 'ok') {
+  cz.className = cp.className = 'conf ' + (sit === 'pend' ? 'pend' : 'ok');
+  if (sit === 'comprada') {
+    const cq = esc(estado.compra.comprado_por || 'Admin') + ', ' + quando(estado.compra.comprado_em);
+    cz.innerHTML = 'Esta lista já foi comprada (' + cq + ').';
+    cp.innerHTML = 'Compra registrada por ' + cq + '. A lista continua aqui até ser zerada.';
+  } else if (sit === 'ok') {
     cz.innerHTML = 'Lista enviada por ' + quemQuando + '.';
     cp.innerHTML = 'Lista conferida e enviada por ' + quemQuando + '.';
   } else if (sit === 'pend') {
@@ -935,6 +944,7 @@ function desenharCompras() {
   if (!estado.admin) estado.gerenciar = false;
   $('btnTudo').hidden = !estado.admin;
   $('btnGerenciar').hidden = !estado.admin;
+  $('btnZerar').hidden = !estado.admin;
   $('btnRecibos').hidden = !estado.admin;
   $('btnAdmin').textContent = estado.admin ? 'Sair do modo administrador' : 'Sou o administrador';
   $('btnGerenciar').setAttribute('aria-pressed', estado.gerenciar);
@@ -961,7 +971,8 @@ function desenharCompras() {
   const itens = estado.itens.filter((i) => i.status !== 'ok');
   const temItens = itens.length > 0;
   $('btnCopiar').disabled = !temItens;
-  $('btnTudo').disabled = !temItens;
+  $('btnTudo').disabled = !temItens || situacaoEnvio() === 'comprada';
+  $('btnZerar').disabled = !temItens;
 
   if (!temItens) {
     el.innerHTML = estado.erro && !estado.itens.length
@@ -982,7 +993,7 @@ function desenharCompras() {
               <div class="qtd">${qtdDe(i)} ${esc(un(i))}</div>
               ${i.atualizado_por ? `<div class="item-meta">${esc(i.atualizado_por)}, ${quando(i.atualizado_em)}</div>` : ''}
             </div>
-            ${estado.admin ? `<button class="btn-ok" type="button" data-comprado aria-label="Marcar ${esc(i.nome)} como comprado">Comprado</button>` : ''}
+            ${estado.admin ? `<button class="btn-ok" type="button" data-comprado aria-label="Dar baixa em ${esc(i.nome)}">Dar baixa</button>` : ''}
           </div>
         </div>`).join('')}</div>
     </div>`;
@@ -1098,11 +1109,17 @@ async function tudoComprado() {
     id: novoId(), comprado_por: estado.usuario, comprado_em: new Date().toISOString(), total_itens: its.length,
     itens: its.map((i) => ({ nome: i.nome, quantidade: qtdDe(i), unidade: un(i) }))
   };
-  // Primeiro registra a compra; só zera a lista se o registro deu certo
   try { await api.registrarCompra(compra); }
-  catch (e) { toast('A compra não foi registrada e a lista continua como estava. ' + (e.message || ''), true); return; }
-  for (const i of its) await salvar(i.id, { status: 'ok', quantidade: '', pedido_extra: false });
+  catch (e) { toast('A compra não foi registrada. ' + (e.message || ''), true); return; }
+  estado.compra = compra;
+  desenhar();
   abrirRecibo(compra);
+}
+
+async function zerarLista() {
+  const ids = estado.itens.filter((i) => i.status !== 'ok').map((i) => i.id);
+  for (const id of ids) await salvar(id, { status: 'ok', quantidade: '', pedido_extra: false });
+  toast('Lista zerada');
 }
 
 /* ---------- Recibos ---------- */
@@ -1220,6 +1237,9 @@ function trocarView(view) {
 document.querySelectorAll('.aba').forEach((b) => b.addEventListener('click', () => trocarView(b.dataset.view)));
 $('btnQuem').addEventListener('click', () => pedirNome(false));
 $('fab').addEventListener('click', () => abrirPedido(''));
+$('btnZerar').addEventListener('click', () => estado.admin && confirmar('Zerar a lista?',
+  situacaoEnvio() === 'comprada' ? 'As quantidades em falta voltam para zero. O recibo da compra continua salvo.' : 'Esta lista ainda não tem compra registrada. As quantidades em falta voltam para zero sem gerar recibo.',
+  'Zerar lista', true, zerarLista));
 $('btnRecibos').addEventListener('click', () => estado.admin && abrirRecibos());
 $('btnPdf').addEventListener('click', baixarRecibo);
 $('btnConferir').addEventListener('click', abrirConferencia);
@@ -1248,7 +1268,7 @@ $('btnAdmin').addEventListener('click', () => {
   $('dlgPin').showModal();
   $('inPin').focus();
 });
-$('btnTudo').addEventListener('click', () => estado.admin && confirmar('Marcar tudo como comprado?', 'A compra fica registrada, o recibo é gerado e a lista volta para zero.', 'Sim, tudo comprado', false, tudoComprado));
+$('btnTudo').addEventListener('click', () => estado.admin && confirmar('Marcar tudo como comprado?', 'A compra fica registrada e o recibo é gerado. A lista continua aqui até você zerar.', 'Sim, tudo comprado', false, tudoComprado));
 $('btnConfOk').addEventListener('click', () => { $('dlgConf').close(); const a = acaoConfirmada; acaoConfirmada = null; if (a) a(); });
 
 $('busca').addEventListener('input', (e) => { estado.busca = e.target.value; desenharCozinha(); });
@@ -1288,7 +1308,7 @@ $('listaCompras').addEventListener('click', (e) => {
   const item = estado.itens.find((i) => i.id === id);
   if (!item) return;
   if (!estado.admin) return;
-  if (e.target.closest('[data-comprado]')) salvar(id, { status: 'ok', quantidade: '', pedido_extra: false }, item.nome + ': comprado');
+  if (e.target.closest('[data-comprado]')) salvar(id, { status: 'ok', quantidade: '', pedido_extra: false }, item.nome + ' saiu da lista');
   else if (e.target.closest('[data-remover]'))
     confirmar('Remover "' + item.nome + '"?', 'O item sai da lista da cozinha. Dá para adicionar de novo depois.', 'Remover', true, () => salvar(id, { ativo: false }, 'Item removido'));
 });
