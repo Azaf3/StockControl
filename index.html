@@ -226,6 +226,24 @@ button { cursor: pointer; border: 0; background: none; -webkit-tap-highlight-col
   white-space: nowrap;
 }
 .fab:active { transform: translateX(-50%) scale(.97); }
+.barra {
+  position: fixed; left: 0; right: 0; bottom: calc(18px + env(safe-area-inset-bottom)); z-index: 15;
+  display: flex; justify-content: center; gap: 10px; padding: 0 12px; pointer-events: none;
+}
+.barra .fab { position: static; transform: none; pointer-events: auto; padding: 0 20px; font-size: 15px; }
+.barra .fab:active { transform: scale(.97); }
+.fab-sec { background: var(--bege-50); color: var(--verde-900); border: 1.5px solid var(--bege-300); box-shadow: 0 6px 18px rgba(18,51,42,.18); }
+.fab .conta { font-family: var(--f-mono); font-size: 13px; background: var(--bege-100); color: var(--verde-900); border-radius: 999px; padding: 1px 8px; }
+
+.conf { padding: 10px 14px; border-radius: var(--raio-p); font-size: 14px; font-weight: 500; margin-bottom: 12px; }
+.conf.ok { background: var(--ok-bg); color: var(--verde-700); }
+.conf.pend { background: var(--pouco-bg); color: #6b4708; }
+
+.rev { max-height: 44vh; overflow: auto; border: 1.5px solid var(--bege-200); border-radius: var(--raio-p); background: #fff; }
+.rev div { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: 10px 12px; border-top: 1px solid var(--bege-200); font-weight: 500; }
+.rev div:first-child { border-top: 0; }
+.rev b { font-family: var(--f-mono); font-weight: 600; color: var(--falta); white-space: nowrap; }
+.erro-solto { color: var(--falta); font-size: 13px; font-weight: 500; margin-top: 10px; }
 
 dialog {
   border: 0; padding: 0; width: min(520px, 100%); max-width: 100%;
@@ -318,6 +336,7 @@ fieldset.campo { border: 0; padding: 0; margin-left: 0; margin-right: 0; }
       </div>
       <div class="sinc" id="sincTxt" aria-live="polite"></div>
     </div>
+    <div class="conf" id="confCozinha" hidden></div>
 
     <div class="busca">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
@@ -342,6 +361,7 @@ fieldset.campo { border: 0; padding: 0; margin-left: 0; margin-right: 0; }
       <div class="numero f"><b id="numFalta">0</b><span>itens em falta</span></div>
       <div class="numero p"><b id="numNovos">0</b><span>pedidos novos</span></div>
     </div>
+    <div class="conf" id="confCompras" hidden></div>
     <div class="acoes">
       <button class="btn btn-pri" type="button" id="btnCopiar">Copiar lista</button>
       <button class="btn btn-sec" type="button" id="btnTudo">Tudo comprado</button>
@@ -351,10 +371,13 @@ fieldset.campo { border: 0; padding: 0; margin-left: 0; margin-right: 0; }
   </section>
 </main>
 
-<button class="fab" id="fab" type="button">
-  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
-  Pedir outro item
-</button>
+<div class="barra" id="barra">
+  <button class="fab fab-sec" id="fab" type="button">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+    Outro item
+  </button>
+  <button class="fab" id="btnConferir" type="button" hidden>Conferir lista <span class="conta" id="contaConf"></span></button>
+</div>
 
 <!-- ===== DIÁLOGOS ===== -->
 <dialog id="dlgNome" aria-labelledby="dlgNomeT">
@@ -424,6 +447,19 @@ fieldset.campo { border: 0; padding: 0; margin-left: 0; margin-right: 0; }
   </div>
 </dialog>
 
+<dialog id="dlgEnvio" aria-labelledby="dlgEnvioT">
+  <div class="dlg">
+    <h2 id="dlgEnvioT">Conferir lista</h2>
+    <p id="envioTxt"></p>
+    <div class="rev" id="envioLista"></div>
+    <div class="erro-solto" id="erEnvio" role="alert" hidden></div>
+    <div class="dlg-acoes">
+      <button class="btn btn-sec" type="button" data-fechar>Corrigir</button>
+      <button class="btn btn-pri" type="button" id="btnEnviar">Está certo, enviar</button>
+    </div>
+  </div>
+</dialog>
+
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
 <script>
@@ -434,6 +470,7 @@ const CONFIG = {
   SUPABASE_URL: 'https://leietuxwxnufawupvzrm.supabase.co',
   SUPABASE_KEY: 'sb_publishable_r7hSygYetxzXdP_o81Qs1w_lG-GCTBW', // publishable key (pode ficar no site)
   TABELA: 'cozinha_itens',
+  TABELA_ENVIOS: 'cozinha_envios',
   PIN_COMPRAS: '',         // deixe vazio para não pedir código na aba Compras
   INTERVALO_MS: 20000      // de quanto em quanto tempo busca atualizações
 };
@@ -457,6 +494,7 @@ const MODO_DEMO = !CONFIG.SUPABASE_URL || !CONFIG.SUPABASE_KEY;
 const CH_LOCAL = 'aba_cozinha_itens_v2';
 const CH_NOME = 'aba_cozinha_nome';
 const CH_PIN = 'aba_cozinha_pin_ok';
+const CH_ENVIO = 'aba_cozinha_envio_v1';
 
 /* ============================================================
    2. UTILITÁRIOS
@@ -554,6 +592,22 @@ const api = {
     return r[0] || item;
   },
 
+  // Última conferência feita pela cozinha (quem confirmou, quando e o quê)
+  async ultimoEnvio() {
+    if (MODO_DEMO) return lerLocal(CH_ENVIO, null);
+    const r = await api.req(CONFIG.TABELA_ENVIOS + '?select=*&order=enviado_em.desc&limit=1');
+    return r[0] || null;
+  },
+
+  async registrarEnvio(envio) {
+    if (MODO_DEMO) {
+      if (!gravarLocal(CH_ENVIO, envio)) throw new Error('Não foi possível salvar neste aparelho.');
+      return envio;
+    }
+    const r = await api.req(CONFIG.TABELA_ENVIOS, { method: 'POST', body: JSON.stringify(envio) });
+    return r[0] || envio;
+  },
+
   async atualizar(id, mudancas) {
     if (MODO_DEMO) {
       const todos = lerLocal(CH_LOCAL, []);
@@ -591,6 +645,7 @@ const estado = {
   gerenciar: false,
   usuario: lerLocal(CH_NOME, ''),
   pendentes: 0,
+  envio: null,
   ultimaSinc: null
 };
 
@@ -598,9 +653,10 @@ async function carregar(silencioso) {
   if (estado.pendentes > 0 || fila.size > 0) return;
   if (!silencioso) { estado.carregando = true; desenhar(); }
   try {
-    const itens = await api.listar();
+    const [itens, envio] = await Promise.all([api.listar(), api.ultimoEnvio().catch(() => estado.envio)]);
     if (estado.pendentes > 0 || fila.size > 0) return; // alguém marcou algo enquanto buscava
     estado.itens = itens;
+    estado.envio = envio;
     estado.erro = null;
     estado.ultimaSinc = new Date();
   } catch (e) {
@@ -684,7 +740,15 @@ async function enviar(id) {
     desenharTopo();
   }
 }
-function enviarTudo() { for (const id of [...fila.keys()]) enviar(id); }
+function enviarTudo() { return Promise.all([...fila.keys()].map(enviar)); }
+
+// 'ok' = a lista atual foi conferida e enviada; 'pend' = há faltas marcadas depois da última conferência
+function situacaoEnvio() {
+  const faltas = estado.itens.filter((i) => i.status !== 'ok');
+  if (!faltas.length) return null;
+  const t = estado.envio ? new Date(estado.envio.enviado_em).getTime() : 0;
+  return faltas.some((i) => new Date(i.atualizado_em).getTime() > t) ? 'pend' : 'ok';
+}
 
 function contar() {
   let falta = 0, novos = 0;
@@ -728,6 +792,22 @@ function desenharTopo() {
 
   $('avisoDemo').hidden = !MODO_DEMO;
   $('avisoErro').hidden = !estado.erro;
+  const sit = situacaoEnvio();
+  const ev = estado.envio;
+  const quemQuando = ev ? esc(ev.enviado_por || 'Cozinha') + ', ' + quando(ev.enviado_em) : '';
+  const cz = $('confCozinha'), cp = $('confCompras');
+  cz.hidden = cp.hidden = !sit;
+  cz.className = cp.className = 'conf ' + (sit || '');
+  if (sit === 'ok') {
+    cz.innerHTML = 'Lista enviada por ' + quemQuando + '.';
+    cp.innerHTML = 'Lista conferida e enviada por ' + quemQuando + '.';
+  } else if (sit === 'pend') {
+    cz.innerHTML = 'Lista ainda não enviada. Quando terminar, toque em <b>Conferir lista</b>.';
+    cp.innerHTML = ev ? 'A cozinha mudou a lista depois da última conferência (' + quemQuando + ') e ainda não conferiu de novo.' : 'A cozinha ainda não conferiu esta lista.';
+  }
+  $('btnConferir').hidden = sit !== 'pend';
+  $('contaConf').textContent = falta;
+
   $('avisoErroTxt').textContent = estado.erro ? estado.erro + ' A lista pode estar desatualizada.' : '';
 }
 
@@ -768,7 +848,7 @@ function desenharCozinha() {
   if (!estado.itens.length) {
     el.innerHTML = estado.erro
       ? `<div class="estado"><h3>Não deu para carregar a lista</h3><div>Confira a internet e tente de novo.</div><button class="btn btn-pri" type="button" data-recarregar>Tentar de novo</button></div>`
-      : `<div class="estado"><h3>A lista ainda está vazia</h3><div>Toque em "Pedir outro item" para começar.</div></div>`;
+      : `<div class="estado"><h3>A lista ainda está vazia</h3><div>Toque em "Outro item" para começar.</div></div>`;
     return;
   }
 
@@ -849,7 +929,7 @@ function desenhar() {
   const coz = estado.view === 'cozinha';
   $('viewCozinha').hidden = !coz;
   $('viewCompras').hidden = coz;
-  $('fab').hidden = !coz;
+  $('barra').hidden = !coz;
   $('abaCozinha').setAttribute('aria-selected', coz);
   $('abaCompras').setAttribute('aria-selected', !coz);
   if (coz) desenharCozinha(); else desenharCompras();
@@ -879,6 +959,37 @@ function abrirPedido(nomeInicial) {
   erroCampo($('inItem'), $('erItem'), '');
   $('dlgItem').showModal();
   $('inItem').focus();
+}
+
+function abrirConferencia() {
+  const its = estado.itens.filter((i) => i.status !== 'ok').sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+  if (!its.length) return;
+  $('envioTxt').textContent = 'Você marcou ' + its.length + (its.length === 1 ? ' item' : ' itens') + ' em falta. As quantidades estão certas?';
+  $('envioLista').innerHTML = its.map((i) => `<div><span>${esc(i.nome)}</span><b>${qtdDe(i)} ${esc(un(i))}</b></div>`).join('');
+  $('erEnvio').hidden = true;
+  $('dlgEnvio').showModal();
+}
+
+async function confirmarEnvio() {
+  const btn = $('btnEnviar');
+  btn.disabled = true; btn.textContent = 'Enviando';
+  try {
+    await enviarTudo(); // garante que os últimos toques já foram salvos
+    const its = estado.itens.filter((i) => i.status !== 'ok');
+    const envio = await api.registrarEnvio({
+      id: novoId(), enviado_por: estado.usuario, enviado_em: new Date().toISOString(), total_itens: its.length,
+      itens: its.map((i) => ({ nome: i.nome, quantidade: qtdDe(i), unidade: un(i) }))
+    });
+    estado.envio = envio;
+    $('dlgEnvio').close();
+    toast('Lista enviada com ' + its.length + (its.length === 1 ? ' item' : ' itens'));
+  } catch (e) {
+    $('erEnvio').textContent = 'Não foi possível enviar. ' + (e.message || 'Tente de novo.');
+    $('erEnvio').hidden = false;
+  } finally {
+    btn.disabled = false; btn.textContent = 'Está certo, enviar';
+    desenhar();
+  }
 }
 
 let acaoConfirmada = null;
@@ -939,6 +1050,8 @@ function trocarView(view) {
 document.querySelectorAll('.aba').forEach((b) => b.addEventListener('click', () => trocarView(b.dataset.view)));
 $('btnQuem').addEventListener('click', () => pedirNome(false));
 $('fab').addEventListener('click', () => abrirPedido(''));
+$('btnConferir').addEventListener('click', abrirConferencia);
+$('btnEnviar').addEventListener('click', confirmarEnvio);
 $('btnTentar').addEventListener('click', () => carregar(false));
 $('btnCopiar').addEventListener('click', copiarLista);
 $('btnGerenciar').addEventListener('click', () => { estado.gerenciar = !estado.gerenciar; desenhar(); });

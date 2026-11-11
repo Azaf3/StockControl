@@ -59,3 +59,25 @@ select * from (values
   ('Margarina', 'Laticínios e frios', 'un')
 ) as v(nome, categoria, unidade)
 where not exists (select 1 from public.cozinha_itens);
+
+-- Conferências da cozinha: cada vez que alguém confere e envia a lista,
+-- fica registrado quem enviou, quando e quais itens e quantidades.
+create table if not exists public.cozinha_envios (
+  id          uuid primary key default gen_random_uuid(),
+  enviado_por text not null default '' check (char_length(enviado_por) <= 30),
+  enviado_em  timestamptz not null default now(),
+  total_itens integer not null default 0,
+  itens       jsonb not null default '[]'::jsonb
+);
+
+create index if not exists cozinha_envios_data_idx on public.cozinha_envios (enviado_em desc);
+
+alter table public.cozinha_envios enable row level security;
+
+drop policy if exists "envios ler"       on public.cozinha_envios;
+drop policy if exists "envios registrar" on public.cozinha_envios;
+
+create policy "envios ler"       on public.cozinha_envios for select to anon using (true);
+create policy "envios registrar" on public.cozinha_envios for insert to anon with check (true);
+
+grant select, insert on public.cozinha_envios to anon;
