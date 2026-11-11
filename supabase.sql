@@ -1,5 +1,5 @@
 -- Lista da Cozinha | Creche Renascer | ABA
--- Rodar uma vez no SQL Editor do Supabase.
+-- Pode rodar quantas vezes quiser no SQL Editor do Supabase.
 
 create table if not exists public.cozinha_itens (
   id             uuid primary key default gen_random_uuid(),
@@ -14,11 +14,19 @@ create table if not exists public.cozinha_itens (
   criado_em      timestamptz not null default now()
 );
 
+-- Unidade de cada item (pct, litros, cx...). A quantidade em falta fica em "quantidade".
+alter table public.cozinha_itens
+  add column if not exists unidade text not null default 'un' check (char_length(unidade) <= 12);
+
 create index if not exists cozinha_itens_ativo_idx on public.cozinha_itens (ativo, nome);
 
--- Acesso pelo site (chave anon): ler, adicionar e atualizar. Sem delete:
+-- Acesso pelo site (publishable key): ler, adicionar e atualizar. Sem delete:
 -- "remover" no sistema só marca ativo = false, então nada se perde.
 alter table public.cozinha_itens enable row level security;
+
+drop policy if exists "cozinha ler"       on public.cozinha_itens;
+drop policy if exists "cozinha adicionar" on public.cozinha_itens;
+drop policy if exists "cozinha atualizar" on public.cozinha_itens;
 
 create policy "cozinha ler"       on public.cozinha_itens for select to anon using (true);
 create policy "cozinha adicionar" on public.cozinha_itens for insert to anon with check (true);
@@ -26,25 +34,28 @@ create policy "cozinha atualizar" on public.cozinha_itens for update to anon usi
 
 grant select, insert, update on public.cozinha_itens to anon;
 
--- Itens da lista de compras da Creche Renascer.
-insert into public.cozinha_itens (nome, categoria) values
-  ('Arroz', 'Mercearia'),
-  ('Feijão', 'Mercearia'),
-  ('Feijão preto', 'Mercearia'),
-  ('Açúcar', 'Mercearia'),
-  ('Óleo', 'Mercearia'),
-  ('Sal', 'Mercearia'),
-  ('Café', 'Mercearia'),
-  ('Achocolatado', 'Mercearia'),
-  ('Macarrão padre nosso', 'Mercearia'),
-  ('Macarrão parafuso', 'Mercearia'),
-  ('Vinagre', 'Mercearia'),
-  ('Farinha de mandioca', 'Mercearia'),
-  ('Polvilho', 'Mercearia'),
-  ('Milho em lata', 'Mercearia'),
-  ('Fermento em pó', 'Mercearia'),
-  ('Massa de bolo', 'Mercearia'),
-  ('Peta', 'Mercearia'),
-  ('Biscoito rosquinha', 'Mercearia'),
-  ('Leite', 'Laticínios e frios'),
-  ('Margarina', 'Laticínios e frios');
+-- Itens da creche: só entram se a tabela estiver vazia.
+insert into public.cozinha_itens (nome, categoria, unidade)
+select * from (values
+  ('Arroz', 'Mercearia', 'fardos'),
+  ('Feijão', 'Mercearia', 'pct'),
+  ('Feijão preto', 'Mercearia', 'pct'),
+  ('Açúcar', 'Mercearia', 'pct'),
+  ('Óleo', 'Mercearia', 'litros'),
+  ('Sal', 'Mercearia', 'pct'),
+  ('Café', 'Mercearia', 'pct'),
+  ('Achocolatado', 'Mercearia', 'pct'),
+  ('Macarrão padre nosso', 'Mercearia', 'pct'),
+  ('Macarrão parafuso', 'Mercearia', 'pct'),
+  ('Vinagre', 'Mercearia', 'litros'),
+  ('Farinha de mandioca', 'Mercearia', 'pct'),
+  ('Polvilho', 'Mercearia', 'pct'),
+  ('Milho em lata', 'Mercearia', 'latas'),
+  ('Fermento em pó', 'Mercearia', 'un'),
+  ('Massa de bolo', 'Mercearia', 'pct'),
+  ('Peta', 'Mercearia', 'pct'),
+  ('Biscoito rosquinha', 'Mercearia', 'pct'),
+  ('Leite', 'Laticínios e frios', 'cx'),
+  ('Margarina', 'Laticínios e frios', 'un')
+) as v(nome, categoria, unidade)
+where not exists (select 1 from public.cozinha_itens);

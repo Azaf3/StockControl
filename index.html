@@ -152,7 +152,6 @@ button { cursor: pointer; border: 0; background: none; -webkit-tap-highlight-col
 .item { padding: 12px 14px; border-top: 1px solid var(--bege-200); border-left: 4px solid transparent; transition: background .2s, border-color .2s; }
 .item:first-child { border-top: 0; }
 .item[data-status="falta"] { border-left-color: var(--falta); background: #fdf5f2; }
-.item[data-status="acabando"] { border-left-color: #d49a2f; background: #fdf8ec; }
 .item-linha { display: flex; align-items: center; gap: 12px; }
 .item-info { flex: 1; min-width: 0; }
 .item-nome { font-weight: 700; font-size: 16px; overflow-wrap: anywhere; }
@@ -162,21 +161,18 @@ button { cursor: pointer; border: 0; background: none; -webkit-tap-highlight-col
   background: var(--verde-100); color: var(--verde-700); margin-left: 6px; vertical-align: 2px;
 }
 
-.seg { display: flex; flex: none; background: var(--bege-200); border-radius: 10px; padding: 3px; gap: 2px; }
-.seg button {
-  min-width: 54px; height: 40px; padding: 0 8px; border-radius: 8px;
-  font-size: 13px; font-weight: 700; color: var(--texto-2); transition: background .15s, color .15s;
-}
-.seg button[aria-pressed="true"][data-s="ok"] { background: var(--ok); color: #fff; }
-.seg button[aria-pressed="true"][data-s="acabando"] { background: #d49a2f; color: #2f1f00; }
-.seg button[aria-pressed="true"][data-s="falta"] { background: var(--falta); color: #fff; }
-
-.item-qtd { margin-top: 10px; }
-.item-qtd input {
-  width: 100%; height: 42px; padding: 0 12px; font-size: 15px;
-  border: 1.5px dashed var(--bege-300); border-radius: 8px; background: #fff;
-}
-.item-qtd input:focus { border-style: solid; border-color: var(--verde-500); outline: none; }
+.passo { display: flex; align-items: center; flex: none; background: var(--bege-200); border-radius: 12px; padding: 3px; gap: 2px; }
+.passo button { width: 44px; height: 44px; border-radius: 9px; font-size: 22px; font-weight: 700; line-height: 1; color: var(--verde-900); background: var(--bege-50); transition: background .15s; }
+.passo button:active { background: var(--verde-100); }
+.passo button[disabled] { opacity: .35; cursor: default; }
+.passo input { width: 46px; height: 44px; border: 0; padding: 0; background: transparent; text-align: center; font-family: var(--f-mono); font-size: 18px; font-weight: 600; }
+.passo input:focus { outline: none; background: #fff; border-radius: 8px; }
+.item[data-status="falta"] .passo input { color: var(--falta); }
+.un { flex: none; width: 44px; font-size: 12px; font-weight: 500; color: var(--texto-2); }
+.item-meta b { color: var(--falta); font-weight: 700; }
+.linha2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.sel-un { flex: none; height: 40px; padding: 0 8px; border: 1.5px solid var(--bege-300); border-radius: 10px; background: #fff; font-size: 14px; }
+.item-compra .qtd { font-size: 15px; font-weight: 600; color: var(--falta); }
 
 /* Compras */
 .item-compra { display: flex; align-items: center; gap: 12px; }
@@ -193,7 +189,7 @@ button { cursor: pointer; border: 0; background: none; -webkit-tap-highlight-col
 .numero b { display: block; font-family: var(--f-mono); font-size: 28px; font-weight: 600; line-height: 1; }
 .numero span { font-size: 13px; color: var(--texto-2); }
 .numero.f b { color: var(--falta); }
-.numero.p b { color: var(--pouco); }
+.numero.p b { color: var(--verde-700); }
 
 .acoes { display: flex; gap: 8px; flex-wrap: wrap; }
 .btn {
@@ -274,7 +270,9 @@ fieldset.campo { border: 0; padding: 0; margin-left: 0; margin-right: 0; }
 .toast.erro { background: var(--falta); }
 
 @media (max-width: 400px) {
-  .seg button { min-width: 46px; padding: 0 4px; font-size: 12px; }
+  .passo button { width: 40px; }
+  .passo input { width: 38px; }
+  .un { width: 38px; }
   .topo h1 { font-size: 16px; }
 }
 @media (prefers-reduced-motion: reduce) {
@@ -341,8 +339,8 @@ fieldset.campo { border: 0; padding: 0; margin-left: 0; margin-right: 0; }
       <div class="sinc" id="sincTxt2"></div>
     </div>
     <div class="numeros">
-      <div class="numero f"><b id="numFalta">0</b><span>em falta</span></div>
-      <div class="numero p"><b id="numPouco">0</b><span>acabando</span></div>
+      <div class="numero f"><b id="numFalta">0</b><span>itens em falta</span></div>
+      <div class="numero p"><b id="numNovos">0</b><span>pedidos novos</span></div>
     </div>
     <div class="acoes">
       <button class="btn btn-pri" type="button" id="btnCopiar">Copiar lista</button>
@@ -381,21 +379,17 @@ fieldset.campo { border: 0; padding: 0; margin-left: 0; margin-right: 0; }
       <input id="inItem" type="text" maxlength="60" autocomplete="off" placeholder="Ex.: Canela em pó" aria-describedby="erItem">
       <div class="erro" id="erItem" hidden></div>
     </div>
-    <div class="campo">
-      <label for="inQtd">Quantidade ou observação (opcional)</label>
-      <input id="inQtd" type="text" maxlength="80" autocomplete="off" placeholder="Ex.: 2 pacotes">
-    </div>
-    <div class="campo">
-      <label for="inCat">Categoria</label>
-      <select id="inCat"></select>
-    </div>
-    <fieldset class="campo">
-      <legend>Situação</legend>
-      <div class="opcoes">
-        <label><input type="radio" name="sit" value="falta" checked>Em falta</label>
-        <label><input type="radio" name="sit" value="acabando">Acabando</label>
+    <div class="linha2">
+      <div class="campo">
+        <label for="inQtd">Quantidade</label>
+        <input id="inQtd" type="text" inputmode="numeric" maxlength="3" autocomplete="off" value="1" aria-describedby="erQtd">
+        <div class="erro" id="erQtd" hidden></div>
       </div>
-    </fieldset>
+      <div class="campo">
+        <label for="inUn">Unidade</label>
+        <select id="inUn"></select>
+      </div>
+    </div>
     <div class="dlg-acoes">
       <button class="btn btn-sec" type="button" data-fechar>Cancelar</button>
       <button class="btn btn-pri" type="submit" id="btnSalvarItem">Adicionar</button>
@@ -446,14 +440,21 @@ const CONFIG = {
 
 const CATEGORIAS = ['Mercearia', 'Hortifruti', 'Carnes e ovos', 'Laticínios e frios', 'Limpeza', 'Descartáveis', 'Outros'];
 
-// Itens de exemplo usados só no modo demonstração (sem Supabase configurado)
-const EXEMPLOS = {
-  'Mercearia': ['Arroz', 'Feijão', 'Feijão preto', 'Açúcar', 'Óleo', 'Sal', 'Café', 'Achocolatado', 'Macarrão padre nosso', 'Macarrão parafuso', 'Vinagre', 'Farinha de mandioca', 'Polvilho', 'Milho em lata', 'Fermento em pó', 'Massa de bolo', 'Peta', 'Biscoito rosquinha'],
-  'Laticínios e frios': ['Leite', 'Margarina']
-};
+const UNIDADES = ['pct', 'kg', 'litros', 'cx', 'fardos', 'latas', 'un'];
+
+// Itens usados só no modo demonstração (sem Supabase configurado): [nome, categoria, unidade]
+const EXEMPLOS = [
+  ['Arroz', 'Mercearia', 'fardos'], ['Feijão', 'Mercearia', 'pct'], ['Feijão preto', 'Mercearia', 'pct'],
+  ['Açúcar', 'Mercearia', 'pct'], ['Óleo', 'Mercearia', 'litros'], ['Sal', 'Mercearia', 'pct'],
+  ['Café', 'Mercearia', 'pct'], ['Achocolatado', 'Mercearia', 'pct'], ['Macarrão padre nosso', 'Mercearia', 'pct'],
+  ['Macarrão parafuso', 'Mercearia', 'pct'], ['Vinagre', 'Mercearia', 'litros'], ['Farinha de mandioca', 'Mercearia', 'pct'],
+  ['Polvilho', 'Mercearia', 'pct'], ['Milho em lata', 'Mercearia', 'latas'], ['Fermento em pó', 'Mercearia', 'un'],
+  ['Massa de bolo', 'Mercearia', 'pct'], ['Peta', 'Mercearia', 'pct'], ['Biscoito rosquinha', 'Mercearia', 'pct'],
+  ['Leite', 'Laticínios e frios', 'cx'], ['Margarina', 'Laticínios e frios', 'un']
+];
 
 const MODO_DEMO = !CONFIG.SUPABASE_URL || !CONFIG.SUPABASE_KEY;
-const CH_LOCAL = 'aba_cozinha_itens_v1';
+const CH_LOCAL = 'aba_cozinha_itens_v2';
 const CH_NOME = 'aba_cozinha_nome';
 const CH_PIN = 'aba_cozinha_pin_ok';
 
@@ -508,6 +509,7 @@ const api = {
       const r = await fetch(CONFIG.SUPABASE_URL.replace(/\/$/, '') + '/rest/v1/' + caminho, {
         ...opcoes,
         signal: ctrl.signal,
+        keepalive: true,
         headers: {
           apikey: CONFIG.SUPABASE_KEY,
           'Content-Type': 'application/json',
@@ -533,7 +535,7 @@ const api = {
       let itens = lerLocal(CH_LOCAL, null);
       if (!Array.isArray(itens)) {
         itens = [];
-        for (const cat in EXEMPLOS) for (const nome of EXEMPLOS[cat]) itens.push(itemNovo({ nome, categoria: cat, status: 'ok' }));
+        for (const [nome, categoria, unidade] of EXEMPLOS) itens.push(itemNovo({ nome, categoria, unidade }));
         gravarLocal(CH_LOCAL, itens);
       }
       return itens.filter((i) => i.ativo);
@@ -570,7 +572,7 @@ const api = {
 function itemNovo(dados) {
   const agora = new Date().toISOString();
   return {
-    id: novoId(), nome: '', categoria: 'Outros', status: 'ok', quantidade: '',
+    id: novoId(), nome: '', categoria: 'Outros', unidade: 'un', status: 'ok', quantidade: '',
     pedido_extra: false, ativo: true, atualizado_por: '', atualizado_em: agora, criado_em: agora,
     ...dados
   };
@@ -593,11 +595,11 @@ const estado = {
 };
 
 async function carregar(silencioso) {
-  if (estado.pendentes > 0) return;
+  if (estado.pendentes > 0 || fila.size > 0) return;
   if (!silencioso) { estado.carregando = true; desenhar(); }
   try {
     const itens = await api.listar();
-    if (estado.pendentes > 0) return; // alguém marcou algo enquanto buscava
+    if (estado.pendentes > 0 || fila.size > 0) return; // alguém marcou algo enquanto buscava
     estado.itens = itens;
     estado.erro = null;
     estado.ultimaSinc = new Date();
@@ -607,7 +609,7 @@ async function carregar(silencioso) {
     estado.carregando = false;
     // não redesenha por cima de quem está digitando
     const foco = document.activeElement;
-    if (silencioso && foco && foco.matches && foco.matches('.item-qtd input')) { desenharTopo(); return; }
+    if (silencioso && foco && foco.matches && foco.matches('.passo input')) { desenharTopo(); return; }
     desenhar();
   }
 }
@@ -639,13 +641,55 @@ async function salvar(id, mudancas, msgOk) {
 /* ============================================================
    5. DESENHO DA TELA
    ============================================================ */
-const ROTULO = { ok: 'Tem', acabando: 'Pouco', falta: 'Falta' };
-const ORDEM_STATUS = { falta: 0, acabando: 1, ok: 2 };
+// Quantidade em falta de um item (0 = tem na cozinha)
+function qtdDe(i) {
+  if (i.status === 'ok') return 0;
+  const n = parseInt(i.quantidade, 10);
+  return n > 0 ? n : 1;
+}
+const un = (i) => i.unidade || 'un';
+
+// Os toques em + e − mudam a tela na hora e são enviados juntos logo depois
+const fila = new Map();
+function definirQtd(id, n) {
+  const item = estado.itens.find((i) => i.id === id);
+  if (!item) return;
+  n = Math.max(0, Math.min(999, Math.round(Number(n)) || 0));
+  if (n === qtdDe(item)) { desenhar(); return; }
+  item.status = n > 0 ? 'falta' : 'ok';
+  item.quantidade = n > 0 ? String(n) : '';
+  if (n === 0) item.pedido_extra = false;
+  item.atualizado_por = estado.usuario;
+  item.atualizado_em = new Date().toISOString();
+  clearTimeout(fila.get(id));
+  fila.set(id, setTimeout(() => enviar(id), 700));
+  desenhar();
+}
+async function enviar(id) {
+  clearTimeout(fila.get(id));
+  fila.delete(id);
+  const i = estado.itens.find((x) => x.id === id);
+  if (!i) return;
+  estado.pendentes++;
+  try {
+    await api.atualizar(id, { status: i.status, quantidade: i.quantidade, pedido_extra: i.pedido_extra, atualizado_por: i.atualizado_por, atualizado_em: i.atualizado_em });
+    estado.erro = null;
+  } catch (e) {
+    toast('Não salvou. ' + (e.message || 'Tente de novo.'), true);
+    estado.pendentes--;
+    await carregar(true); // volta ao que está salvo de verdade
+    estado.pendentes++;
+  } finally {
+    estado.pendentes--;
+    desenharTopo();
+  }
+}
+function enviarTudo() { for (const id of [...fila.keys()]) enviar(id); }
 
 function contar() {
-  let falta = 0, pouco = 0;
-  for (const i of estado.itens) { if (i.status === 'falta') falta++; else if (i.status === 'acabando') pouco++; }
-  return { falta, pouco };
+  let falta = 0, novos = 0;
+  for (const i of estado.itens) if (i.status !== 'ok') { falta++; if (i.pedido_extra) novos++; }
+  return { falta, novos };
 }
 
 function agrupar(itens) {
@@ -660,8 +704,8 @@ function agrupar(itens) {
 }
 
 function desenharTopo() {
-  const { falta, pouco } = contar();
-  const total = falta + pouco;
+  const { falta, novos } = contar();
+  const total = falta;
   const hoje = new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' });
   $('dataHoje').textContent = hoje;
   $('dataHoje2').textContent = hoje;
@@ -671,19 +715,14 @@ function desenharTopo() {
   c.hidden = total === 0;
   c.textContent = total;
 
-  let txt = 'Tudo em ordem';
+  let txt = 'Nada em falta';
   if (estado.carregando && !estado.itens.length) txt = 'Carregando';
-  else if (total) {
-    const p = [];
-    if (falta) p.push(falta + ' em falta');
-    if (pouco) p.push(pouco + ' acabando');
-    txt = p.join(' · ');
-  }
+  else if (falta) txt = falta + (falta === 1 ? ' item em falta' : ' itens em falta');
   $('resumoTxt').textContent = txt;
   $('numFalta').textContent = falta;
-  $('numPouco').textContent = pouco;
+  $('numNovos').textContent = novos;
 
-  const sinc = estado.pendentes ? 'Salvando' : estado.ultimaSinc ? 'Atualizado ' + estado.ultimaSinc.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '';
+  const sinc = (estado.pendentes || fila.size) ? 'Salvando' : estado.ultimaSinc ? 'Atualizado ' + estado.ultimaSinc.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '';
   $('sincTxt').textContent = sinc;
   $('sincTxt2').textContent = sinc;
 
@@ -693,8 +732,8 @@ function desenharTopo() {
 }
 
 function desenharChips() {
-  const { falta, pouco } = contar();
-  const ops = [['todos', 'Todos'], ['falta', 'Em falta' + (falta ? ' (' + falta + ')' : '')], ['acabando', 'Acabando' + (pouco ? ' (' + pouco + ')' : '')]];
+  const { falta } = contar();
+  const ops = [['todos', 'Todos'], ['falta', 'Em falta' + (falta ? ' (' + falta + ')' : '')]];
   $('chipsFiltro').innerHTML = ops.map(([v, r]) =>
     `<button class="chip" type="button" data-filtro="${v}" aria-pressed="${estado.filtro === v}">${r}</button>`).join('');
 }
@@ -702,23 +741,23 @@ function desenharChips() {
 function htmlEsqueleto() { return '<div class="esq"></div>'.repeat(5); }
 
 function htmlItemCozinha(i) {
-  const meta = i.atualizado_por ? `${esc(i.atualizado_por)}, ${quando(i.atualizado_em)}` : '';
-  const seg = ['ok', 'acabando', 'falta'].map((s) =>
-    `<button type="button" data-s="${s}" aria-pressed="${i.status === s}" aria-label="${esc(i.nome)}: ${ROTULO[s]}">${ROTULO[s]}</button>`).join('');
-  const qtd = i.status === 'ok' ? '' : `
-    <div class="item-qtd">
-      <label class="sr" for="q-${i.id}">Quantidade ou observação de ${esc(i.nome)}</label>
-      <input id="q-${i.id}" type="text" maxlength="80" autocomplete="off" placeholder="Quanto precisa? (opcional)" value="${esc(i.quantidade)}">
-    </div>`;
+  const q = qtdDe(i);
+  const quem = i.atualizado_por ? `${esc(i.atualizado_por)}, ${quando(i.atualizado_em)}` : '';
+  const meta = q ? `<b>Falta ${q} ${esc(un(i))}</b>${quem ? ' · ' + quem : ''}` : 'Tem na cozinha';
   return `
-    <div class="item" data-id="${i.id}" data-status="${i.status}">
+    <div class="item" data-id="${i.id}" data-status="${q ? 'falta' : 'ok'}">
       <div class="item-linha">
         <div class="item-info">
           <div class="item-nome">${esc(i.nome)}${i.pedido_extra ? '<span class="selo">Pedido novo</span>' : ''}</div>
-          ${meta ? `<div class="item-meta">${meta}</div>` : ''}
+          <div class="item-meta">${meta}</div>
         </div>
-        <div class="seg" role="group" aria-label="Situação de ${esc(i.nome)}">${seg}</div>
-      </div>${qtd}
+        <div class="passo" role="group" aria-label="Quantidade em falta de ${esc(i.nome)}">
+          <button type="button" data-d="-1" aria-label="Diminuir ${esc(i.nome)}"${q ? '' : ' disabled'}>−</button>
+          <input type="text" inputmode="numeric" maxlength="3" autocomplete="off" value="${q}" aria-label="Quantidade em falta de ${esc(i.nome)}, em ${esc(un(i))}">
+          <button type="button" data-d="1" aria-label="Aumentar ${esc(i.nome)}">+</button>
+        </div>
+        <span class="un">${esc(un(i))}</span>
+      </div>
     </div>`;
 }
 
@@ -735,10 +774,10 @@ function desenharCozinha() {
 
   const b = norm(estado.busca);
   const itens = estado.itens.filter((i) =>
-    (estado.filtro === 'todos' || i.status === estado.filtro) && (!b || norm(i.nome).includes(b)));
+    (estado.filtro === 'todos' || i.status !== 'ok') && (!b || norm(i.nome).includes(b)));
 
   if (!itens.length) {
-    const msg = b ? `Nenhum item com "${esc(estado.busca)}".` : 'Nenhum item nessa situação agora.';
+    const msg = b ? `Nenhum item com "${esc(estado.busca)}".` : 'Nenhum item em falta agora.';
     el.innerHTML = `<div class="estado"><h3>Nada por aqui</h3><div>${msg}</div>${b ? '<button class="btn btn-sec" type="button" data-pedir-busca>Pedir esse item</button>' : ''}</div>`;
     return;
   }
@@ -765,6 +804,7 @@ function desenharCompras() {
           <div class="item" data-id="${i.id}">
             <div class="item-compra">
               <div class="item-info"><div class="item-nome">${esc(i.nome)}</div></div>
+              <select class="sel-un" data-unidade aria-label="Unidade de ${esc(i.nome)}">${[...new Set([...UNIDADES, un(i)])].map((u) => `<option${u === un(i) ? ' selected' : ''}>${esc(u)}</option>`).join('')}</select>
               <button class="btn-rem" type="button" data-remover aria-label="Remover ${esc(i.nome)} da lista">Remover</button>
             </div>
           </div>`).join('')}</div>
@@ -780,22 +820,21 @@ function desenharCompras() {
   if (!temItens) {
     el.innerHTML = estado.erro && !estado.itens.length
       ? `<div class="estado"><h3>Não deu para carregar a lista</h3><button class="btn btn-pri" type="button" data-recarregar>Tentar de novo</button></div>`
-      : `<div class="estado"><h3>Nada para comprar agora</h3><div>Quando a cozinha marcar algo, aparece aqui.</div></div>`;
+      : `<div class="estado"><h3>Nada para comprar agora</h3><div>Quando a cozinha marcar uma falta, aparece aqui.</div></div>`;
     return;
   }
 
   el.innerHTML = agrupar(itens).map(([cat, lista]) => {
-    lista.sort((a, b) => ORDEM_STATUS[a.status] - ORDEM_STATUS[b.status] || a.nome.localeCompare(b.nome, 'pt-BR'));
     return `
     <div class="grupo">
       <h3>${esc(cat)} <span>${lista.length}</span></h3>
       <div class="cartao">${lista.map((i) => `
-        <div class="item" data-id="${i.id}" data-status="${i.status}">
+        <div class="item" data-id="${i.id}" data-status="falta">
           <div class="item-compra">
             <div class="item-info">
               <div class="item-nome">${esc(i.nome)}${i.pedido_extra ? '<span class="selo">Pedido novo</span>' : ''}</div>
-              ${i.quantidade ? `<div class="qtd">${esc(i.quantidade)}</div>` : ''}
-              <div class="item-meta">${i.status === 'falta' ? 'Em falta' : 'Acabando'}${i.atualizado_por ? ' · ' + esc(i.atualizado_por) + ', ' + quando(i.atualizado_em) : ''}</div>
+              <div class="qtd">${qtdDe(i)} ${esc(un(i))}</div>
+              ${i.atualizado_por ? `<div class="item-meta">${esc(i.atualizado_por)}, ${quando(i.atualizado_em)}</div>` : ''}
             </div>
             <button class="btn-ok" type="button" data-comprado aria-label="Marcar ${esc(i.nome)} como comprado">Comprado</button>
           </div>
@@ -836,6 +875,7 @@ function pedirNome(obrigatorio) {
 function abrirPedido(nomeInicial) {
   $('formItem').reset();
   $('inItem').value = nomeInicial || '';
+  erroCampo($('inQtd'), $('erQtd'), '');
   erroCampo($('inItem'), $('erItem'), '');
   $('dlgItem').showModal();
   $('inItem').focus();
@@ -853,15 +893,10 @@ function confirmar(titulo, texto, botao, perigo, acao) {
 }
 
 function textoLista() {
+  const its = estado.itens.filter((i) => i.status !== 'ok').sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
   const linhas = ['Lista de compras', 'Creche Renascer, ' + new Date().toLocaleDateString('pt-BR'), ''];
-  for (const [st, titulo] of [['falta', 'EM FALTA'], ['acabando', 'ACABANDO']]) {
-    const its = estado.itens.filter((i) => i.status === st).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
-    if (!its.length) continue;
-    linhas.push(titulo);
-    for (const i of its) linhas.push('• ' + i.nome + (i.quantidade ? ' (' + i.quantidade + ')' : ''));
-    linhas.push('');
-  }
-  return linhas.join('\n').trim();
+  for (const i of its) linhas.push(i.nome + ' ' + qtdDe(i) + ' ' + un(i));
+  return linhas.join('\n');
 }
 
 async function copiarLista() {
@@ -907,7 +942,7 @@ $('fab').addEventListener('click', () => abrirPedido(''));
 $('btnTentar').addEventListener('click', () => carregar(false));
 $('btnCopiar').addEventListener('click', copiarLista);
 $('btnGerenciar').addEventListener('click', () => { estado.gerenciar = !estado.gerenciar; desenhar(); });
-$('btnTudo').addEventListener('click', () => confirmar('Marcar tudo como comprado?', 'Todos os itens voltam para "Tem" e a lista de compras fica vazia.', 'Sim, tudo comprado', false, tudoComprado));
+$('btnTudo').addEventListener('click', () => confirmar('Marcar tudo como comprado?', 'As quantidades em falta voltam para zero e a lista de compras fica vazia.', 'Sim, tudo comprado', false, tudoComprado));
 $('btnConfOk').addEventListener('click', () => { $('dlgConf').close(); const a = acaoConfirmada; acaoConfirmada = null; if (a) a(); });
 
 $('busca').addEventListener('input', (e) => { estado.busca = e.target.value; desenharCozinha(); });
@@ -921,25 +956,22 @@ $('chipsFiltro').addEventListener('click', (e) => {
 $('listaCozinha').addEventListener('click', (e) => {
   if (e.target.closest('[data-recarregar]')) return carregar(false);
   if (e.target.closest('[data-pedir-busca]')) return abrirPedido(estado.busca.trim());
-  const b = e.target.closest('.seg button');
+  const b = e.target.closest('.passo button');
   if (!b) return;
   const id = b.closest('.item').dataset.id;
   const item = estado.itens.find((i) => i.id === id);
-  if (!item || item.status === b.dataset.s) return;
-  const m = { status: b.dataset.s };
-  if (b.dataset.s === 'ok') { m.quantidade = ''; m.pedido_extra = false; }
-  salvar(id, m);
+  if (item) definirQtd(id, qtdDe(item) + Number(b.dataset.d));
 });
+$('listaCozinha').addEventListener('focusin', (e) => { if (e.target.matches('.passo input')) e.target.select(); });
 $('listaCozinha').addEventListener('change', (e) => {
-  const inp = e.target.closest('.item-qtd input');
+  const inp = e.target.closest('.passo input');
   if (!inp) return;
-  const id = inp.closest('.item').dataset.id;
-  const item = estado.itens.find((i) => i.id === id);
-  const v = inp.value.trim();
-  if (item && item.quantidade !== v) salvar(id, { quantidade: v }, 'Anotado');
+  const txt = inp.value.trim();
+  if (txt !== '' && !/^\d{1,3}$/.test(txt)) { toast('Digite só números, de 0 a 999.', true); desenhar(); return; }
+  definirQtd(inp.closest('.item').dataset.id, txt === '' ? 0 : Number(txt));
 });
 $('listaCozinha').addEventListener('keydown', (e) => {
-  if (e.key === 'Enter' && e.target.matches('.item-qtd input')) e.target.blur();
+  if (e.key === 'Enter' && e.target.matches('.passo input')) e.target.blur();
 });
 
 $('listaCompras').addEventListener('click', (e) => {
@@ -958,6 +990,11 @@ document.querySelectorAll('[data-fechar]').forEach((b) => b.addEventListener('cl
 document.querySelectorAll('dialog').forEach((d) => {
   d.addEventListener('click', (e) => { if (e.target === d && !d.dataset.obrigatorio) d.close(); });
   d.addEventListener('cancel', (e) => { if (d.dataset.obrigatorio) e.preventDefault(); });
+});
+
+$('listaCompras').addEventListener('change', (e) => {
+  const sel = e.target.closest('[data-unidade]');
+  if (sel) salvar(sel.closest('.item').dataset.id, { unidade: sel.value }, 'Unidade alterada');
 });
 
 $('formNome').addEventListener('submit', (e) => {
@@ -985,14 +1022,17 @@ $('formItem').addEventListener('submit', async (e) => {
   const nome = inp.value.trim().replace(/\s+/g, ' ');
   if (!nome) return erroCampo(inp, $('erItem'), 'Escreva o nome do item.');
   if (nome.length < 2) return erroCampo(inp, $('erItem'), 'O nome precisa ter pelo menos 2 letras.');
+  const qTxt = $('inQtd').value.trim();
+  if (!/^\d{1,3}$/.test(qTxt) || Number(qTxt) < 1) return erroCampo($('inQtd'), $('erQtd'), 'Informe quanto precisa, de 1 a 999.');
+  erroCampo($('inQtd'), $('erQtd'), '');
+  const quantidade = String(Number(qTxt));
   const igual = estado.itens.find((i) => norm(i.nome) === norm(nome));
-  const status = $('formItem').elements.sit.value;
-  const quantidade = $('inQtd').value.trim();
 
-  // Já existe: em vez de duplicar, marca o que está na lista
+  // Já existe: em vez de duplicar, marca a falta no que está na lista
   if (igual) {
     $('dlgItem').close();
-    await salvar(igual.id, { status, quantidade: quantidade || igual.quantidade }, igual.nome + ' já estava na lista e foi marcado');
+    definirQtd(igual.id, Number(quantidade));
+    toast(igual.nome + ' já estava na lista e foi marcado');
     return;
   }
 
@@ -1001,7 +1041,7 @@ $('formItem').addEventListener('submit', async (e) => {
   estado.pendentes++;
   try {
     const criado = await api.criar(itemNovo({
-      nome, categoria: $('inCat').value, status, quantidade,
+      nome, categoria: 'Outros', unidade: $('inUn').value, status: 'falta', quantidade,
       pedido_extra: true, atualizado_por: estado.usuario
     }));
     estado.itens.push(criado);
@@ -1019,13 +1059,14 @@ $('formItem').addEventListener('submit', async (e) => {
 /* ============================================================
    8. INÍCIO
    ============================================================ */
-$('inCat').innerHTML = CATEGORIAS.map((c) => `<option${c === 'Outros' ? ' selected' : ''}>${c}</option>`).join('');
+$('inUn').innerHTML = UNIDADES.map((u) => `<option>${u}</option>`).join('');
 desenhar();
 carregar(false);
 if (!estado.usuario) pedirNome(true);
 
 setInterval(() => { if (!document.hidden && !document.querySelector('dialog[open]')) carregar(true); }, CONFIG.INTERVALO_MS);
-document.addEventListener('visibilitychange', () => { if (!document.hidden) carregar(true); });
+document.addEventListener('visibilitychange', () => { if (document.hidden) enviarTudo(); else carregar(true); });
+window.addEventListener('pagehide', enviarTudo);
 window.addEventListener('online', () => carregar(true));
 window.addEventListener('offline', () => { estado.erro = 'Sem conexão com a internet.'; desenharTopo(); });
 </script>
