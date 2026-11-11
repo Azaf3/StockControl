@@ -9,7 +9,9 @@
 <meta name="robots" content="noindex, nofollow">
 <meta property="og:title" content="Lista da Cozinha | Creche Renascer">
 <meta property="og:description" content="Atualize o que está em falta na cozinha.">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%2312332a'/%3E%3Ctext x='32' y='42' font-family='Arial' font-weight='700' font-size='24' text-anchor='middle' fill='%23f6f0e4'%3EABA%3C/text%3E%3C/svg%3E">
+<link rel="icon" type="image/png" href="icone-app.png">
+<link rel="apple-touch-icon" href="icone-app.png">
+<meta property="og:image" content="https://azaf3.github.io/StockControl/icone-app.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=JetBrains+Mono:wght@400;600&family=Poppins:wght@500;600;700&display=swap" rel="stylesheet">
@@ -83,6 +85,8 @@ button { cursor: pointer; border: 0; background: none; -webkit-tap-highlight-col
   display: grid; place-items: center;
   font-family: var(--f-titulo); font-weight: 700; font-size: 14px; letter-spacing: .5px;
 }
+.marca img { width: 32px; height: 32px; display: block; object-fit: contain; }
+.dlg-logo { display: block; width: 170px; height: auto; margin: 0 auto 16px; }
 .topo h1 { font-size: 18px; font-weight: 600; }
 .topo-sub { font-size: 13px; color: #b9cfc5; }
 .quem {
@@ -314,7 +318,7 @@ fieldset.campo { border: 0; padding: 0; margin-left: 0; margin-right: 0; }
 <header class="topo">
   <div class="wrap">
     <div class="topo-linha">
-      <div class="marca" aria-hidden="true">ABA</div>
+      <div class="marca"><img src="icone.png" alt="ABA Alimentos e Distribuição" width="32" height="32"></div>
       <div>
         <h1>Lista da Cozinha</h1>
         <div class="topo-sub">Creche Renascer</div>
@@ -395,6 +399,7 @@ fieldset.campo { border: 0; padding: 0; margin-left: 0; margin-right: 0; }
 <!-- ===== DIÁLOGOS ===== -->
 <dialog id="dlgNome" aria-labelledby="dlgNomeT">
   <form class="dlg" id="formNome" novalidate>
+    <img class="dlg-logo" src="logo.png" alt="ABA Alimentos e Distribuição" width="720" height="322">
     <h2 id="dlgNomeT">Quem está atualizando?</h2>
     <p>Seu nome aparece ao lado do que você marcar. Se outra pessoa for usar este aparelho, troque o nome aqui.</p>
     <div class="campo">
@@ -1164,10 +1169,33 @@ function carregarJsPDF() {
   });
 }
 
-function montarPdf(c, jsPDF) {
+// Logo para o PDF (carregada uma vez; se falhar, o recibo sai com o cabeçalho só de texto)
+let logoPdf;
+async function carregarLogo() {
+  if (logoPdf !== undefined) return logoPdf;
+  try {
+    const r = await fetch('logo.png');
+    if (!r.ok) throw new Error();
+    const blob = await r.blob();
+    logoPdf = await new Promise((ok, falha) => { const fr = new FileReader(); fr.onload = () => ok(fr.result); fr.onerror = falha; fr.readAsDataURL(blob); });
+  } catch (e) { logoPdf = null; }
+  return logoPdf;
+}
+
+function montarPdf(c, jsPDF, logo) {
   const doc = new jsPDF({ unit: 'mm', format: 'a4' });
   const E = 18, D = 192; // margens esquerda e direita
   const cabecalho = () => {
+    if (logo) {
+      doc.addImage(logo, 'PNG', E, 7, 51.4, 23);
+      doc.setTextColor(18, 51, 42);
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(15); doc.text('Recibo de compra', D, 15, { align: 'right' });
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(10); doc.setTextColor(92, 107, 100);
+      doc.text('Nº ' + numRecibo(c), D, 22, { align: 'right' });
+      doc.text(new Date(c.comprado_em).toLocaleDateString('pt-BR'), D, 27.5, { align: 'right' });
+      doc.setDrawColor(18, 51, 42); doc.setLineWidth(0.8); doc.line(E, 35, D, 35);
+      return;
+    }
     doc.setFillColor(18, 51, 42); doc.rect(0, 0, 210, 34, 'F');
     doc.setTextColor(246, 240, 228);
     doc.setFont('helvetica', 'bold'); doc.setFontSize(15); doc.text('ABA Alimentos e Distribuição', E, 15);
@@ -1215,9 +1243,9 @@ async function baixarRecibo() {
   btn.disabled = true; btn.textContent = 'Gerando';
   $('erRecibo').hidden = true;
   try {
-    await carregarJsPDF();
+    const [, logo] = await Promise.all([carregarJsPDF(), carregarLogo()]);
     const c = reciboAberto;
-    montarPdf(c, window.jspdf.jsPDF).save('recibo-creche-renascer-' + String(c.comprado_em).slice(0, 10) + '-' + numRecibo(c) + '.pdf');
+    montarPdf(c, window.jspdf.jsPDF, logo).save('recibo-creche-renascer-' + String(c.comprado_em).slice(0, 10) + '-' + numRecibo(c) + '.pdf');
   } catch (e) {
     $('erRecibo').textContent = e.message || 'Não foi possível gerar o PDF.';
     $('erRecibo').hidden = false;
