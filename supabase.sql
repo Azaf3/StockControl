@@ -102,3 +102,8 @@ create policy "compras ler"       on public.cozinha_compras for select to anon u
 create policy "compras registrar" on public.cozinha_compras for insert to anon with check (true);
 
 grant select, insert on public.cozinha_compras to anon;
+
+-- Permite apagar recibos pelo site (botão "Apagar este recibo", só visível ao administrador).
+drop policy if exists "compras apagar" on public.cozinha_compras;
+create policy "compras apagar" on public.cozinha_compras for delete to anon using (true);
+grant delete on public.cozinha_compras to anon;

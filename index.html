@@ -257,6 +257,7 @@ button { cursor: pointer; border: 0; background: none; -webkit-tap-highlight-col
 .rev button:first-child { border-top: 0; }
 .rev button:active { background: var(--bege-100); }
 .rev button span:last-child { font-family: var(--f-mono); font-size: 13px; color: var(--texto-2); white-space: nowrap; }
+.link-perigo { color: var(--falta); margin-top: 14px; }
 .erro-solto { color: var(--falta); font-size: 13px; font-weight: 500; margin-top: 10px; }
 
 dialog {
@@ -476,6 +477,7 @@ fieldset.campo { border: 0; padding: 0; margin-left: 0; margin-right: 0; }
       <button class="btn btn-sec" type="button" data-fechar>Fechar</button>
       <button class="btn btn-pri" type="button" id="btnPdf">Baixar PDF</button>
     </div>
+    <button class="link-adm link-perigo" type="button" id="btnApagarRecibo" hidden>Apagar este recibo</button>
   </div>
 </dialog>
 
@@ -667,6 +669,16 @@ const api = {
     }
     const r = await api.req(CONFIG.TABELA_COMPRAS, { method: 'POST', body: JSON.stringify(compra) });
     return r[0] || compra;
+  },
+
+  async apagarCompra(id) {
+    if (MODO_DEMO) {
+      if (!gravarLocal(CH_COMPRAS, lerLocal(CH_COMPRAS, []).filter((c) => c.id !== id))) throw new Error('Não foi possível salvar neste aparelho.');
+      return;
+    }
+    const r = await api.req(CONFIG.TABELA_COMPRAS + '?id=eq.' + encodeURIComponent(id), { method: 'DELETE' });
+    // sem permissão de apagar no banco, o servidor responde vazio em vez de dar erro
+    if (!r.length) throw new Error('O banco não deixou apagar. Confira se o SQL de permissão foi rodado.');
   },
 
   async listarCompras() {
@@ -1139,6 +1151,7 @@ function abrirRecibo(c) {
   $('reciboLista').innerHTML = listaDe(c).map((i) => `<div><span>${esc(i.nome)}</span><b>${esc(i.quantidade)} ${esc(i.unidade)}</b></div>`).join('');
   $('reciboTotal').textContent = listaDe(c).length;
   $('erRecibo').hidden = true;
+  $('btnApagarRecibo').hidden = !estado.admin;
   if ($('dlgRecibos').open) $('dlgRecibos').close();
   $('dlgRecibo').showModal();
 }
@@ -1156,6 +1169,22 @@ async function abrirRecibos() {
   } catch (e) {
     el.innerHTML = `<div class="estado"><h3>Não deu para carregar os recibos</h3><div>${esc(e.message || '')}</div></div>`;
   }
+}
+
+async function apagarRecibo(c) {
+  try {
+    await api.apagarCompra(c.id);
+  } catch (e) {
+    $('erRecibo').textContent = 'Não foi possível apagar. ' + (e.message || 'Tente de novo.');
+    $('erRecibo').hidden = false;
+    return;
+  }
+  reciboAberto = null;
+  $('dlgRecibo').close();
+  toast('Recibo apagado');
+  // se era a compra mais recente, a lista deixa de constar como comprada
+  if (estado.compra && estado.compra.id === c.id) { estado.compra = null; await carregar(true); }
+  abrirRecibos();
 }
 
 function carregarJsPDF() {
@@ -1270,6 +1299,11 @@ $('btnZerar').addEventListener('click', () => estado.admin && confirmar('Zerar a
   'Zerar lista', true, zerarLista));
 $('btnRecibos').addEventListener('click', () => estado.admin && abrirRecibos());
 $('btnPdf').addEventListener('click', baixarRecibo);
+$('btnApagarRecibo').addEventListener('click', () => {
+  const c = reciboAberto;
+  if (!c || !estado.admin) return;
+  confirmar('Apagar o recibo Nº ' + numRecibo(c) + '?', 'A compra de ' + dataHora(c.comprado_em) + ' sai do histórico e não dá para recuperar.', 'Apagar recibo', true, () => apagarRecibo(c));
+});
 $('btnConferir').addEventListener('click', abrirConferencia);
 $('btnEnviar').addEventListener('click', confirmarEnvio);
 $('btnTentar').addEventListener('click', () => carregar(false));
