@@ -81,3 +81,24 @@ create policy "envios ler"       on public.cozinha_envios for select to anon usi
 create policy "envios registrar" on public.cozinha_envios for insert to anon with check (true);
 
 grant select, insert on public.cozinha_envios to anon;
+
+-- Compras finalizadas ("Tudo comprado"): base dos recibos.
+create table if not exists public.cozinha_compras (
+  id           uuid primary key default gen_random_uuid(),
+  comprado_por text not null default '' check (char_length(comprado_por) <= 30),
+  comprado_em  timestamptz not null default now(),
+  total_itens  integer not null default 0,
+  itens        jsonb not null default '[]'::jsonb
+);
+
+create index if not exists cozinha_compras_data_idx on public.cozinha_compras (comprado_em desc);
+
+alter table public.cozinha_compras enable row level security;
+
+drop policy if exists "compras ler"       on public.cozinha_compras;
+drop policy if exists "compras registrar" on public.cozinha_compras;
+
+create policy "compras ler"       on public.cozinha_compras for select to anon using (true);
+create policy "compras registrar" on public.cozinha_compras for insert to anon with check (true);
+
+grant select, insert on public.cozinha_compras to anon;

@@ -244,6 +244,15 @@ button { cursor: pointer; border: 0; background: none; -webkit-tap-highlight-col
 .rev div:first-child { border-top: 0; }
 .rev b { font-family: var(--f-mono); font-weight: 600; color: var(--falta); white-space: nowrap; }
 .link-adm { display: block; margin: 28px auto 0; padding: 10px 14px; font-size: 13px; font-weight: 500; color: var(--texto-2); text-decoration: underline; }
+.rec-meta { font-size: 13px; color: var(--texto-2); margin: 0 0 12px; line-height: 1.6; }
+.rec-meta b { color: var(--texto); font-weight: 700; }
+.rec-total { display: flex; justify-content: space-between; margin-top: 12px; font-weight: 700; }
+.rec-total span:last-child { font-family: var(--f-mono); }
+.rev.ok b { color: var(--verde-700); }
+.rev button { display: flex; width: 100%; justify-content: space-between; gap: 12px; padding: 12px; border-top: 1px solid var(--bege-200); font-weight: 500; text-align: left; }
+.rev button:first-child { border-top: 0; }
+.rev button:active { background: var(--bege-100); }
+.rev button span:last-child { font-family: var(--f-mono); font-size: 13px; color: var(--texto-2); white-space: nowrap; }
 .erro-solto { color: var(--falta); font-size: 13px; font-weight: 500; margin-top: 10px; }
 
 dialog {
@@ -367,6 +376,7 @@ fieldset.campo { border: 0; padding: 0; margin-left: 0; margin-right: 0; }
       <button class="btn btn-pri" type="button" id="btnCopiar">Copiar lista</button>
       <button class="btn btn-sec" type="button" id="btnTudo" hidden>Tudo comprado</button>
       <button class="btn btn-sec" type="button" id="btnGerenciar" aria-pressed="false" hidden>Gerenciar itens</button>
+      <button class="btn btn-sec" type="button" id="btnRecibos" hidden>Recibos</button>
     </div>
     <div id="listaCompras"></div>
     <button class="link-adm" type="button" id="btnAdmin"></button>
@@ -449,6 +459,29 @@ fieldset.campo { border: 0; padding: 0; margin-left: 0; margin-right: 0; }
   </div>
 </dialog>
 
+<dialog id="dlgRecibo" aria-labelledby="dlgReciboT">
+  <div class="dlg">
+    <h2 id="dlgReciboT">Recibo de compra</h2>
+    <p class="rec-meta" id="reciboMeta"></p>
+    <div class="rev ok" id="reciboLista"></div>
+    <div class="rec-total"><span>Total de itens pedidos</span><span id="reciboTotal"></span></div>
+    <div class="erro-solto" id="erRecibo" role="alert" hidden></div>
+    <div class="dlg-acoes">
+      <button class="btn btn-sec" type="button" data-fechar>Fechar</button>
+      <button class="btn btn-pri" type="button" id="btnPdf">Baixar PDF</button>
+    </div>
+  </div>
+</dialog>
+
+<dialog id="dlgRecibos" aria-labelledby="dlgRecibosT">
+  <div class="dlg">
+    <h2 id="dlgRecibosT">Recibos de compras</h2>
+    <p>Toque em uma compra para abrir o recibo.</p>
+    <div id="recibosLista"></div>
+    <div class="dlg-acoes"><button class="btn btn-sec" type="button" data-fechar>Fechar</button></div>
+  </div>
+</dialog>
+
 <dialog id="dlgEnvio" aria-labelledby="dlgEnvioT">
   <div class="dlg">
     <h2 id="dlgEnvioT">Conferir lista</h2>
@@ -473,6 +506,8 @@ const CONFIG = {
   SUPABASE_KEY: 'sb_publishable_r7hSygYetxzXdP_o81Qs1w_lG-GCTBW', // publishable key (pode ficar no site)
   TABELA: 'cozinha_itens',
   TABELA_ENVIOS: 'cozinha_envios',
+  TABELA_COMPRAS: 'cozinha_compras',
+  JSPDF_URL: 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js',
   ADMIN_NOME: 'Admin',     // nome que aparece nas ações do administrador (reservado, ninguém mais pode usar)
   // SHA-256 do código do administrador. Para trocar o código, gere o hash do novo e cole aqui.
   ADMIN_HASH: '4c853a64e191c45efee67734742a76b3a36536a564072c0bbb3377c862f26412',
@@ -499,6 +534,7 @@ const CH_LOCAL = 'aba_cozinha_itens_v2';
 const CH_NOME = 'aba_cozinha_nome';
 const CH_ADMIN = 'aba_cozinha_admin';
 const CH_ENVIO = 'aba_cozinha_envio_v1';
+const CH_COMPRAS = 'aba_cozinha_compras_v1';
 
 /* ============================================================
    2. UTILITÁRIOS
@@ -613,6 +649,23 @@ const api = {
     }
     const r = await api.req(CONFIG.TABELA_ENVIOS, { method: 'POST', body: JSON.stringify(envio) });
     return r[0] || envio;
+  },
+
+  // Compras finalizadas (base dos recibos)
+  async registrarCompra(compra) {
+    if (MODO_DEMO) {
+      const todas = lerLocal(CH_COMPRAS, []);
+      todas.unshift(compra);
+      if (!gravarLocal(CH_COMPRAS, todas.slice(0, 50))) throw new Error('Não foi possível salvar neste aparelho.');
+      return compra;
+    }
+    const r = await api.req(CONFIG.TABELA_COMPRAS, { method: 'POST', body: JSON.stringify(compra) });
+    return r[0] || compra;
+  },
+
+  async listarCompras() {
+    if (MODO_DEMO) return lerLocal(CH_COMPRAS, []).slice(0, 20);
+    return api.req(CONFIG.TABELA_COMPRAS + '?select=*&order=comprado_em.desc&limit=20');
   },
 
   async atualizar(id, mudancas) {
@@ -882,6 +935,7 @@ function desenharCompras() {
   if (!estado.admin) estado.gerenciar = false;
   $('btnTudo').hidden = !estado.admin;
   $('btnGerenciar').hidden = !estado.admin;
+  $('btnRecibos').hidden = !estado.admin;
   $('btnAdmin').textContent = estado.admin ? 'Sair do modo administrador' : 'Sou o administrador';
   $('btnGerenciar').setAttribute('aria-pressed', estado.gerenciar);
   $('btnGerenciar').textContent = estado.gerenciar ? 'Voltar para compras' : 'Gerenciar itens';
@@ -1038,9 +1092,119 @@ async function copiarLista() {
 }
 
 async function tudoComprado() {
-  const alvo = estado.itens.filter((i) => i.status !== 'ok').map((i) => i.id);
-  for (const id of alvo) await salvar(id, { status: 'ok', quantidade: '', pedido_extra: false });
-  toast('Lista zerada');
+  const its = estado.itens.filter((i) => i.status !== 'ok').sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+  if (!its.length) return;
+  const compra = {
+    id: novoId(), comprado_por: estado.usuario, comprado_em: new Date().toISOString(), total_itens: its.length,
+    itens: its.map((i) => ({ nome: i.nome, quantidade: qtdDe(i), unidade: un(i) }))
+  };
+  // Primeiro registra a compra; só zera a lista se o registro deu certo
+  try { await api.registrarCompra(compra); }
+  catch (e) { toast('A compra não foi registrada e a lista continua como estava. ' + (e.message || ''), true); return; }
+  for (const i of its) await salvar(i.id, { status: 'ok', quantidade: '', pedido_extra: false });
+  abrirRecibo(compra);
+}
+
+/* ---------- Recibos ---------- */
+const numRecibo = (c) => String(c.id || '').replace(/-/g, '').slice(0, 8).toUpperCase();
+const dataHora = (iso) => { const d = new Date(iso); return d.toLocaleDateString('pt-BR') + ' às ' + d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }); };
+const listaDe = (c) => (Array.isArray(c.itens) ? c.itens : []);
+
+let reciboAberto = null;
+function abrirRecibo(c) {
+  reciboAberto = c;
+  $('reciboMeta').innerHTML = `Nº <b>${esc(numRecibo(c))}</b><br>Creche Renascer<br>${esc(dataHora(c.comprado_em))}${c.comprado_por ? ', por ' + esc(c.comprado_por) : ''}`;
+  $('reciboLista').innerHTML = listaDe(c).map((i) => `<div><span>${esc(i.nome)}</span><b>${esc(i.quantidade)} ${esc(i.unidade)}</b></div>`).join('');
+  $('reciboTotal').textContent = listaDe(c).length;
+  $('erRecibo').hidden = true;
+  if ($('dlgRecibos').open) $('dlgRecibos').close();
+  $('dlgRecibo').showModal();
+}
+
+async function abrirRecibos() {
+  const el = $('recibosLista');
+  el.innerHTML = htmlEsqueleto();
+  $('dlgRecibos').showModal();
+  try {
+    const compras = await api.listarCompras();
+    el.innerHTML = compras.length
+      ? '<div class="rev">' + compras.map((c, n) => `<button type="button" data-n="${n}"><span>${esc(dataHora(c.comprado_em))}</span><span>${listaDe(c).length} ${listaDe(c).length === 1 ? 'item' : 'itens'}</span></button>`).join('') + '</div>'
+      : '<div class="estado"><h3>Nenhuma compra registrada</h3><div>O recibo aparece aqui depois de um "Tudo comprado".</div></div>';
+    el.onclick = (e) => { const b = e.target.closest('[data-n]'); if (b) abrirRecibo(compras[Number(b.dataset.n)]); };
+  } catch (e) {
+    el.innerHTML = `<div class="estado"><h3>Não deu para carregar os recibos</h3><div>${esc(e.message || '')}</div></div>`;
+  }
+}
+
+function carregarJsPDF() {
+  if (window.jspdf) return Promise.resolve();
+  return new Promise((ok, falha) => {
+    const sc = document.createElement('script');
+    sc.src = CONFIG.JSPDF_URL;
+    sc.onload = () => (window.jspdf ? ok() : falha(new Error('O gerador de PDF não carregou direito.')));
+    sc.onerror = () => { sc.remove(); falha(new Error('Não foi possível carregar o gerador de PDF. Confira a internet.')); };
+    document.head.appendChild(sc);
+  });
+}
+
+function montarPdf(c, jsPDF) {
+  const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+  const E = 18, D = 192; // margens esquerda e direita
+  const cabecalho = () => {
+    doc.setFillColor(18, 51, 42); doc.rect(0, 0, 210, 34, 'F');
+    doc.setTextColor(246, 240, 228);
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(15); doc.text('ABA Alimentos e Distribuição', E, 15);
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(11); doc.text('Recibo de compra', E, 24);
+    doc.setFontSize(10); doc.text('Nº ' + numRecibo(c), D, 15, { align: 'right' });
+    doc.text(new Date(c.comprado_em).toLocaleDateString('pt-BR'), D, 24, { align: 'right' });
+  };
+  const topoTabela = (y) => {
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(9); doc.setTextColor(92, 107, 100);
+    doc.text('ITEM', E, y); doc.text('QUANTIDADE', D, y, { align: 'right' });
+    doc.setDrawColor(217, 205, 180); doc.setLineWidth(0.4); doc.line(E, y + 2.5, D, y + 2.5);
+    return y + 9;
+  };
+  cabecalho();
+  doc.setTextColor(28, 42, 37); doc.setFontSize(11);
+  let y = 46;
+  for (const [rot, val] of [['Cliente', 'Creche Renascer'], ['Data da compra', dataHora(c.comprado_em)], ['Registrado por', c.comprado_por || 'ABA']]) {
+    doc.setFont('helvetica', 'bold'); doc.text(rot + ':', E, y);
+    doc.setFont('helvetica', 'normal'); doc.text(String(val), E + 34, y);
+    y += 6.5;
+  }
+  y = topoTabela(y + 6);
+  const itens = listaDe(c);
+  itens.forEach((i, n) => {
+    if (y > 272) { doc.addPage(); cabecalho(); y = topoTabela(46); }
+    if (n % 2 === 0) { doc.setFillColor(251, 248, 241); doc.rect(E - 2, y - 5.5, D - E + 4, 8, 'F'); }
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(11); doc.setTextColor(28, 42, 37);
+    doc.text(String(i.nome), E, y);
+    doc.setFont('helvetica', 'bold'); doc.text(i.quantidade + ' ' + i.unidade, D, y, { align: 'right' });
+    y += 8;
+  });
+  if (y > 262) { doc.addPage(); cabecalho(); y = 50; }
+  doc.setDrawColor(18, 51, 42); doc.setLineWidth(0.6); doc.line(E, y, D, y);
+  y += 8;
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(12); doc.setTextColor(18, 51, 42);
+  doc.text('Total de itens pedidos', E, y); doc.text(String(itens.length), D, y, { align: 'right' });
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(92, 107, 100);
+  doc.text('Recibo gerado pelo sistema Lista da Cozinha.', E, 287);
+  return doc;
+}
+
+async function baixarRecibo() {
+  if (!reciboAberto) return;
+  const btn = $('btnPdf');
+  btn.disabled = true; btn.textContent = 'Gerando';
+  $('erRecibo').hidden = true;
+  try {
+    await carregarJsPDF();
+    const c = reciboAberto;
+    montarPdf(c, window.jspdf.jsPDF).save('recibo-creche-renascer-' + String(c.comprado_em).slice(0, 10) + '-' + numRecibo(c) + '.pdf');
+  } catch (e) {
+    $('erRecibo').textContent = e.message || 'Não foi possível gerar o PDF.';
+    $('erRecibo').hidden = false;
+  } finally { btn.disabled = false; btn.textContent = 'Baixar PDF'; }
 }
 
 function trocarView(view) {
@@ -1056,6 +1220,8 @@ function trocarView(view) {
 document.querySelectorAll('.aba').forEach((b) => b.addEventListener('click', () => trocarView(b.dataset.view)));
 $('btnQuem').addEventListener('click', () => pedirNome(false));
 $('fab').addEventListener('click', () => abrirPedido(''));
+$('btnRecibos').addEventListener('click', () => estado.admin && abrirRecibos());
+$('btnPdf').addEventListener('click', baixarRecibo);
 $('btnConferir').addEventListener('click', abrirConferencia);
 $('btnEnviar').addEventListener('click', confirmarEnvio);
 $('btnTentar').addEventListener('click', () => carregar(false));
@@ -1082,7 +1248,7 @@ $('btnAdmin').addEventListener('click', () => {
   $('dlgPin').showModal();
   $('inPin').focus();
 });
-$('btnTudo').addEventListener('click', () => estado.admin && confirmar('Marcar tudo como comprado?', 'As quantidades em falta voltam para zero e a lista de compras fica vazia.', 'Sim, tudo comprado', false, tudoComprado));
+$('btnTudo').addEventListener('click', () => estado.admin && confirmar('Marcar tudo como comprado?', 'A compra fica registrada, o recibo é gerado e a lista volta para zero.', 'Sim, tudo comprado', false, tudoComprado));
 $('btnConfOk').addEventListener('click', () => { $('dlgConf').close(); const a = acaoConfirmada; acaoConfirmada = null; if (a) a(); });
 
 $('busca').addEventListener('input', (e) => { estado.busca = e.target.value; desenharCozinha(); });
