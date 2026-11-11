@@ -385,7 +385,7 @@ fieldset.campo { border: 0; padding: 0; margin-left: 0; margin-right: 0; }
 <dialog id="dlgNome" aria-labelledby="dlgNomeT">
   <form class="dlg" id="formNome" novalidate>
     <h2 id="dlgNomeT">Quem está atualizando?</h2>
-    <p>Seu nome aparece ao lado do que você marcar.</p>
+    <p>Seu nome aparece ao lado do que você marcar. Se outra pessoa for usar este aparelho, troque o nome aqui.</p>
     <div class="campo">
       <label for="inNome">Seu nome</label>
       <input id="inNome" type="text" maxlength="30" autocomplete="given-name" aria-describedby="erNome">
@@ -473,6 +473,7 @@ const CONFIG = {
   SUPABASE_KEY: 'sb_publishable_r7hSygYetxzXdP_o81Qs1w_lG-GCTBW', // publishable key (pode ficar no site)
   TABELA: 'cozinha_itens',
   TABELA_ENVIOS: 'cozinha_envios',
+  ADMIN_NOME: 'Azafe',     // nome que aparece nas ações do administrador (reservado, ninguém mais pode usar)
   // SHA-256 do código do administrador. Para trocar o código, gere o hash do novo e cole aqui.
   ADMIN_HASH: '4c853a64e191c45efee67734742a76b3a36536a564072c0bbb3377c862f26412',
   INTERVALO_MS: 20000      // de quanto em quanto tempo busca atualizações
@@ -511,6 +512,9 @@ function lerLocal(chave, padrao) {
   try { const v = localStorage.getItem(chave); return v === null ? padrao : JSON.parse(v); }
   catch (e) { return padrao; }
 }
+// O modo administrador vale só enquanto a aba estiver aberta
+function lerSessao(chave) { try { return sessionStorage.getItem(chave) || ''; } catch (e) { return ''; } }
+function gravarSessao(chave, valor) { try { valor ? sessionStorage.setItem(chave, valor) : sessionStorage.removeItem(chave); } catch (e) {} }
 function gravarLocal(chave, valor) {
   try { localStorage.setItem(chave, JSON.stringify(valor)); return true; }
   catch (e) { return false; }
@@ -649,7 +653,7 @@ const estado = {
   usuario: lerLocal(CH_NOME, ''),
   pendentes: 0,
   envio: null,
-  admin: lerLocal(CH_ADMIN, '') === CONFIG.ADMIN_HASH,
+  admin: lerSessao(CH_ADMIN) === CONFIG.ADMIN_HASH,
   ultimaSinc: null
 };
 
@@ -777,7 +781,7 @@ function desenharTopo() {
   const hoje = new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' });
   $('dataHoje').textContent = hoje;
   $('dataHoje2').textContent = hoje;
-  $('btnQuem').textContent = estado.usuario || 'Seu nome';
+  $('btnQuem').textContent = (estado.usuario || 'Seu nome') + (estado.admin ? ' · admin' : '');
 
   const c = $('contaCompras');
   c.hidden = total === 0;
@@ -1057,12 +1061,20 @@ $('btnEnviar').addEventListener('click', confirmarEnvio);
 $('btnTentar').addEventListener('click', () => carregar(false));
 $('btnCopiar').addEventListener('click', copiarLista);
 $('btnGerenciar').addEventListener('click', () => { if (!estado.admin) return; estado.gerenciar = !estado.gerenciar; desenhar(); });
+const ehNomeAdmin = (nome) => norm(nome) === norm(CONFIG.ADMIN_NOME);
+function sairAdmin() {
+  estado.admin = false;
+  gravarSessao(CH_ADMIN, '');
+  estado.usuario = '';
+  gravarLocal(CH_NOME, '');
+  desenhar();
+}
+
 $('btnAdmin').addEventListener('click', () => {
   if (estado.admin) {
-    estado.admin = false;
-    try { localStorage.removeItem(CH_ADMIN); } catch (e) {}
-    desenhar();
+    sairAdmin();
     toast('Modo administrador desligado');
+    pedirNome(true); // quem continuar usando este aparelho informa o próprio nome
     return;
   }
   $('inPin').value = '';
@@ -1130,6 +1142,12 @@ $('formNome').addEventListener('submit', (e) => {
   e.preventDefault();
   const nome = $('inNome').value.trim().replace(/\s+/g, ' ');
   if (nome.length < 2) return erroCampo($('inNome'), $('erNome'), 'Digite seu nome com pelo menos 2 letras.');
+  if (ehNomeAdmin(nome)) {
+    if (estado.admin) { $('dlgNome').close(); return; } // continua como administrador
+    return erroCampo($('inNome'), $('erNome'), 'Esse nome é do administrador. Use o seu nome.');
+  }
+  // Trocar de pessoa sempre encerra o modo administrador
+  if (estado.admin) { sairAdmin(); toast('Modo administrador desligado'); }
   estado.usuario = nome;
   gravarLocal(CH_NOME, nome);
   $('dlgNome').dataset.obrigatorio = '';
@@ -1150,7 +1168,9 @@ $('formPin').addEventListener('submit', async (e) => {
   catch (er) { return erroCampo($('inPin'), $('erPin'), 'Este navegador não conseguiu validar o código.'); }
   if (hash !== CONFIG.ADMIN_HASH) return erroCampo($('inPin'), $('erPin'), 'Código incorreto.');
   estado.admin = true;
-  gravarLocal(CH_ADMIN, hash);
+  gravarSessao(CH_ADMIN, hash);
+  estado.usuario = CONFIG.ADMIN_NOME; // tudo que o administrador fizer sai com o nome dele
+  gravarLocal(CH_NOME, CONFIG.ADMIN_NOME);
   $('dlgPin').close();
   desenhar();
   toast('Modo administrador ligado');
@@ -1202,6 +1222,8 @@ $('formItem').addEventListener('submit', async (e) => {
 $('inUn').innerHTML = UNIDADES.map((u) => `<option>${u}</option>`).join('');
 desenhar();
 carregar(false);
+// Nome do administrador sem estar no modo administrador (ex.: aba foi fechada): pede o nome de novo
+if (!estado.admin && ehNomeAdmin(estado.usuario)) { estado.usuario = ''; gravarLocal(CH_NOME, ''); desenharTopo(); }
 if (!estado.usuario) pedirNome(true);
 
 setInterval(() => { if (!document.hidden && !document.querySelector('dialog[open]')) carregar(true); }, CONFIG.INTERVALO_MS);
