@@ -26,15 +26,25 @@ create policy "cozinha atualizar" on public.cozinha_itens for update to anon usi
 
 grant select, insert, update on public.cozinha_itens to anon;
 
--- Itens iniciais (exemplos: troque pela lista real da creche antes de rodar,
--- ou rode assim e ajuste depois em Compras > Gerenciar itens).
+-- Itens da lista de compras da Creche Renascer.
 insert into public.cozinha_itens (nome, categoria) values
-  ('Arroz', 'Mercearia'), ('Feijão', 'Mercearia'), ('Macarrão', 'Mercearia'), ('Óleo', 'Mercearia'),
-  ('Açúcar', 'Mercearia'), ('Sal', 'Mercearia'), ('Farinha de trigo', 'Mercearia'), ('Fubá', 'Mercearia'),
-  ('Extrato de tomate', 'Mercearia'), ('Biscoito', 'Mercearia'),
-  ('Banana', 'Hortifruti'), ('Maçã', 'Hortifruti'), ('Laranja', 'Hortifruti'), ('Batata', 'Hortifruti'),
-  ('Cenoura', 'Hortifruti'), ('Cebola', 'Hortifruti'), ('Alho', 'Hortifruti'), ('Tomate', 'Hortifruti'),
-  ('Frango', 'Carnes e ovos'), ('Carne moída', 'Carnes e ovos'), ('Ovos', 'Carnes e ovos'),
-  ('Leite', 'Laticínios e frios'), ('Margarina', 'Laticínios e frios'), ('Queijo', 'Laticínios e frios'),
-  ('Detergente', 'Limpeza'), ('Sabão em pó', 'Limpeza'), ('Água sanitária', 'Limpeza'), ('Esponja', 'Limpeza'),
-  ('Papel toalha', 'Descartáveis'), ('Saco de lixo', 'Descartáveis'), ('Guardanapo', 'Descartáveis');
+  ('Arroz', 'Mercearia'),
+  ('Feijão', 'Mercearia'),
+  ('Feijão preto', 'Mercearia'),
+  ('Açúcar', 'Mercearia'),
+  ('Óleo', 'Mercearia'),
+  ('Sal', 'Mercearia'),
+  ('Café', 'Mercearia'),
+  ('Achocolatado', 'Mercearia'),
+  ('Macarrão padre nosso', 'Mercearia'),
+  ('Macarrão parafuso', 'Mercearia'),
+  ('Vinagre', 'Mercearia'),
+  ('Farinha de mandioca', 'Mercearia'),
+  ('Polvilho', 'Mercearia'),
+  ('Milho em lata', 'Mercearia'),
+  ('Fermento em pó', 'Mercearia'),
+  ('Massa de bolo', 'Mercearia'),
+  ('Peta', 'Mercearia'),
+  ('Biscoito rosquinha', 'Mercearia'),
+  ('Leite', 'Laticínios e frios'),
+  ('Margarina', 'Laticínios e frios');
