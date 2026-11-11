@@ -437,8 +437,8 @@ fieldset.campo { border: 0; padding: 0; margin-left: 0; margin-right: 0; }
    1. CONFIGURAÇÃO  (preencher antes de publicar)
    ============================================================ */
 const CONFIG = {
-  SUPABASE_URL: '',        // ex.: https://xxxxxxxx.supabase.co
-  SUPABASE_KEY: '',        // chave anon (public) do projeto
+  SUPABASE_URL: 'https://leietuxwxnufawupvzrm.supabase.co',
+  SUPABASE_KEY: 'sb_publishable_r7hSygYetxzXdP_o81Qs1w_lG-GCTBW', // publishable key (pode ficar no site)
   TABELA: 'cozinha_itens',
   PIN_COMPRAS: '',         // deixe vazio para não pedir código na aba Compras
   INTERVALO_MS: 20000      // de quanto em quanto tempo busca atualizações
@@ -514,7 +514,6 @@ const api = {
         signal: ctrl.signal,
         headers: {
           apikey: CONFIG.SUPABASE_KEY,
-          Authorization: 'Bearer ' + CONFIG.SUPABASE_KEY,
           'Content-Type': 'application/json',
           Prefer: 'return=representation',
           ...(opcoes.headers || {})
