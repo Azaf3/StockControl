@@ -243,6 +243,7 @@ button { cursor: pointer; border: 0; background: none; -webkit-tap-highlight-col
 .rev div { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: 10px 12px; border-top: 1px solid var(--bege-200); font-weight: 500; }
 .rev div:first-child { border-top: 0; }
 .rev b { font-family: var(--f-mono); font-weight: 600; color: var(--falta); white-space: nowrap; }
+.link-adm { display: block; margin: 28px auto 0; padding: 10px 14px; font-size: 13px; font-weight: 500; color: var(--texto-2); text-decoration: underline; }
 .erro-solto { color: var(--falta); font-size: 13px; font-weight: 500; margin-top: 10px; }
 
 dialog {
@@ -364,10 +365,11 @@ fieldset.campo { border: 0; padding: 0; margin-left: 0; margin-right: 0; }
     <div class="conf" id="confCompras" hidden></div>
     <div class="acoes">
       <button class="btn btn-pri" type="button" id="btnCopiar">Copiar lista</button>
-      <button class="btn btn-sec" type="button" id="btnTudo">Tudo comprado</button>
-      <button class="btn btn-sec" type="button" id="btnGerenciar" aria-pressed="false">Gerenciar itens</button>
+      <button class="btn btn-sec" type="button" id="btnTudo" hidden>Tudo comprado</button>
+      <button class="btn btn-sec" type="button" id="btnGerenciar" aria-pressed="false" hidden>Gerenciar itens</button>
     </div>
     <div id="listaCompras"></div>
+    <button class="link-adm" type="button" id="btnAdmin"></button>
   </section>
 </main>
 
@@ -422,8 +424,8 @@ fieldset.campo { border: 0; padding: 0; margin-left: 0; margin-right: 0; }
 
 <dialog id="dlgPin" aria-labelledby="dlgPinT">
   <form class="dlg" id="formPin" novalidate>
-    <h2 id="dlgPinT">Área de compras</h2>
-    <p>Digite o código para abrir.</p>
+    <h2 id="dlgPinT">Área do administrador</h2>
+    <p>Digite o código para liberar "Comprado" e "Gerenciar itens".</p>
     <div class="campo">
       <label for="inPin">Código</label>
       <input id="inPin" type="password" inputmode="numeric" autocomplete="off" aria-describedby="erPin">
@@ -431,7 +433,7 @@ fieldset.campo { border: 0; padding: 0; margin-left: 0; margin-right: 0; }
     </div>
     <div class="dlg-acoes">
       <button class="btn btn-sec" type="button" data-fechar>Voltar</button>
-      <button class="btn btn-pri" type="submit">Abrir</button>
+      <button class="btn btn-pri" type="submit">Entrar</button>
     </div>
   </form>
 </dialog>
@@ -471,7 +473,8 @@ const CONFIG = {
   SUPABASE_KEY: 'sb_publishable_r7hSygYetxzXdP_o81Qs1w_lG-GCTBW', // publishable key (pode ficar no site)
   TABELA: 'cozinha_itens',
   TABELA_ENVIOS: 'cozinha_envios',
-  PIN_COMPRAS: '',         // deixe vazio para não pedir código na aba Compras
+  // SHA-256 do código do administrador. Para trocar o código, gere o hash do novo e cole aqui.
+  ADMIN_HASH: '4c853a64e191c45efee67734742a76b3a36536a564072c0bbb3377c862f26412',
   INTERVALO_MS: 20000      // de quanto em quanto tempo busca atualizações
 };
 
@@ -493,7 +496,7 @@ const EXEMPLOS = [
 const MODO_DEMO = !CONFIG.SUPABASE_URL || !CONFIG.SUPABASE_KEY;
 const CH_LOCAL = 'aba_cozinha_itens_v2';
 const CH_NOME = 'aba_cozinha_nome';
-const CH_PIN = 'aba_cozinha_pin_ok';
+const CH_ADMIN = 'aba_cozinha_admin';
 const CH_ENVIO = 'aba_cozinha_envio_v1';
 
 /* ============================================================
@@ -646,6 +649,7 @@ const estado = {
   usuario: lerLocal(CH_NOME, ''),
   pendentes: 0,
   envio: null,
+  admin: lerLocal(CH_ADMIN, '') === CONFIG.ADMIN_HASH,
   ultimaSinc: null
 };
 
@@ -871,6 +875,10 @@ function desenharCozinha() {
 
 function desenharCompras() {
   const el = $('listaCompras');
+  if (!estado.admin) estado.gerenciar = false;
+  $('btnTudo').hidden = !estado.admin;
+  $('btnGerenciar').hidden = !estado.admin;
+  $('btnAdmin').textContent = estado.admin ? 'Sair do modo administrador' : 'Sou o administrador';
   $('btnGerenciar').setAttribute('aria-pressed', estado.gerenciar);
   $('btnGerenciar').textContent = estado.gerenciar ? 'Voltar para compras' : 'Gerenciar itens';
   if (estado.carregando && !estado.itens.length) { el.innerHTML = htmlEsqueleto(); return; }
@@ -916,7 +924,7 @@ function desenharCompras() {
               <div class="qtd">${qtdDe(i)} ${esc(un(i))}</div>
               ${i.atualizado_por ? `<div class="item-meta">${esc(i.atualizado_por)}, ${quando(i.atualizado_em)}</div>` : ''}
             </div>
-            <button class="btn-ok" type="button" data-comprado aria-label="Marcar ${esc(i.nome)} como comprado">Comprado</button>
+            ${estado.admin ? `<button class="btn-ok" type="button" data-comprado aria-label="Marcar ${esc(i.nome)} como comprado">Comprado</button>` : ''}
           </div>
         </div>`).join('')}</div>
     </div>`;
@@ -1032,12 +1040,6 @@ async function tudoComprado() {
 }
 
 function trocarView(view) {
-  if (view === 'compras' && CONFIG.PIN_COMPRAS && sessionStorage.getItem(CH_PIN) !== '1') {
-    $('inPin').value = '';
-    erroCampo($('inPin'), $('erPin'), '');
-    $('dlgPin').showModal();
-    return;
-  }
   estado.view = view;
   estado.gerenciar = false;
   desenhar();
@@ -1054,8 +1056,21 @@ $('btnConferir').addEventListener('click', abrirConferencia);
 $('btnEnviar').addEventListener('click', confirmarEnvio);
 $('btnTentar').addEventListener('click', () => carregar(false));
 $('btnCopiar').addEventListener('click', copiarLista);
-$('btnGerenciar').addEventListener('click', () => { estado.gerenciar = !estado.gerenciar; desenhar(); });
-$('btnTudo').addEventListener('click', () => confirmar('Marcar tudo como comprado?', 'As quantidades em falta voltam para zero e a lista de compras fica vazia.', 'Sim, tudo comprado', false, tudoComprado));
+$('btnGerenciar').addEventListener('click', () => { if (!estado.admin) return; estado.gerenciar = !estado.gerenciar; desenhar(); });
+$('btnAdmin').addEventListener('click', () => {
+  if (estado.admin) {
+    estado.admin = false;
+    try { localStorage.removeItem(CH_ADMIN); } catch (e) {}
+    desenhar();
+    toast('Modo administrador desligado');
+    return;
+  }
+  $('inPin').value = '';
+  erroCampo($('inPin'), $('erPin'), '');
+  $('dlgPin').showModal();
+  $('inPin').focus();
+});
+$('btnTudo').addEventListener('click', () => estado.admin && confirmar('Marcar tudo como comprado?', 'As quantidades em falta voltam para zero e a lista de compras fica vazia.', 'Sim, tudo comprado', false, tudoComprado));
 $('btnConfOk').addEventListener('click', () => { $('dlgConf').close(); const a = acaoConfirmada; acaoConfirmada = null; if (a) a(); });
 
 $('busca').addEventListener('input', (e) => { estado.busca = e.target.value; desenharCozinha(); });
@@ -1094,6 +1109,7 @@ $('listaCompras').addEventListener('click', (e) => {
   const id = linha.dataset.id;
   const item = estado.itens.find((i) => i.id === id);
   if (!item) return;
+  if (!estado.admin) return;
   if (e.target.closest('[data-comprado]')) salvar(id, { status: 'ok', quantidade: '', pedido_extra: false }, item.nome + ': comprado');
   else if (e.target.closest('[data-remover]'))
     confirmar('Remover "' + item.nome + '"?', 'O item sai da lista da cozinha. Dá para adicionar de novo depois.', 'Remover', true, () => salvar(id, { ativo: false }, 'Item removido'));
@@ -1107,7 +1123,7 @@ document.querySelectorAll('dialog').forEach((d) => {
 
 $('listaCompras').addEventListener('change', (e) => {
   const sel = e.target.closest('[data-unidade]');
-  if (sel) salvar(sel.closest('.item').dataset.id, { unidade: sel.value }, 'Unidade alterada');
+  if (sel && estado.admin) salvar(sel.closest('.item').dataset.id, { unidade: sel.value }, 'Unidade alterada');
 });
 
 $('formNome').addEventListener('submit', (e) => {
@@ -1121,12 +1137,23 @@ $('formNome').addEventListener('submit', (e) => {
   desenharTopo();
 });
 
-$('formPin').addEventListener('submit', (e) => {
+async function sha256(txt) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(txt));
+  return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+$('formPin').addEventListener('submit', async (e) => {
   e.preventDefault();
-  if ($('inPin').value.trim() !== String(CONFIG.PIN_COMPRAS)) return erroCampo($('inPin'), $('erPin'), 'Código incorreto.');
-  try { sessionStorage.setItem(CH_PIN, '1'); } catch (er) {}
+  const cod = $('inPin').value.trim();
+  if (!cod) return erroCampo($('inPin'), $('erPin'), 'Digite o código.');
+  let hash;
+  try { hash = await sha256(cod); }
+  catch (er) { return erroCampo($('inPin'), $('erPin'), 'Este navegador não conseguiu validar o código.'); }
+  if (hash !== CONFIG.ADMIN_HASH) return erroCampo($('inPin'), $('erPin'), 'Código incorreto.');
+  estado.admin = true;
+  gravarLocal(CH_ADMIN, hash);
   $('dlgPin').close();
-  trocarView('compras');
+  desenhar();
+  toast('Modo administrador ligado');
 });
 
 $('formItem').addEventListener('submit', async (e) => {
